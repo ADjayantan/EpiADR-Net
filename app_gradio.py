@@ -9,6 +9,12 @@ from utils import smiles_to_graph, highlight_toxic_subgraph
 from data_loader import GTEX_TISSUE_PROFILES, MEDDRA_ADR_CLASSES, ORGAN_NAMES, BENCHMARK_DRUGS
 from model import EpiADRNet
 
+# Optional spaces import for HF Zero-GPU runtime compatibility
+try:
+    import spaces
+except ImportError:
+    spaces = None
+
 # Load model instance
 MODEL = EpiADRNet(in_features=5, hidden_dim=128, num_classes=10, dropout=0.2)
 try:
@@ -18,12 +24,12 @@ except Exception:
 MODEL.eval()
 
 
-def predict_single_organ(smiles: str, organ: str, mc_passes: int) -> Tuple[pd.DataFrame, str, str]:
+def predict_single_organ(smiles: str, organ: str, mc_passes: int) -> Tuple[pd.DataFrame, str, Any]:
     """
     Predicts organ-conditioned ADR probabilities, epistemic uncertainty, and XAI toxic hotspots.
     """
     if not smiles or organ not in GTEX_TISSUE_PROFILES:
-        return pd.DataFrame(), "Invalid SMILES or Organ", ""
+        return pd.DataFrame(), "Invalid SMILES or Organ", None
 
     node_feats, edge_index, atom_symbols = smiles_to_graph(smiles)
     batch = torch.zeros(node_feats.size(0), dtype=torch.long)
@@ -180,4 +186,4 @@ with gr.Blocks(title="EpiADR-Net — Hugging Face Space", theme=gr.themes.Soft()
         )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.queue().launch()

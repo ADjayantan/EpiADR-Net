@@ -4,7 +4,7 @@ emoji: 🧬
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: 3.35.0
+sdk_version: 4.44.0
 app_file: app_gradio.py
 pinned: false
 license: mit
@@ -14,10 +14,10 @@ license: mit
 ### Tissue-Conditioned Zero-Shot Side Effect Disaggregation Platform
 
 [![Continuous Integration](https://github.com/ADjayantan/EpiADR-Net/actions/workflows/ci.yml/badge.svg)](https://github.com/ADjayantan/EpiADR-Net/actions)
-[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces)
+[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/jayantan/EpiADR-Net)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-2.0.0-green.svg)](https://fastapi.tiangolo.com/)
-[![Gradio](https://img.shields.io/badge/Gradio-3.35-orange.svg)](https://gradio.app/)
+[![Gradio](https://img.shields.io/badge/Gradio-4.44-orange.svg)](https://gradio.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **EpiADR-Net** is an end-to-end, publication-grade research platform and enterprise microservice stack engineered for **Tissue-Conditioned Zero-Shot Side Effect Disaggregation**. It predicts organ-specific Adverse Drug Reactions (ADRs) by conditioning molecular Graph Neural Network representations on human organ transcriptomic profiles.
@@ -70,20 +70,3 @@ Swagger UI available at: [http://localhost:8000/docs](http://localhost:8000/docs
 ```bash
 streamlit run app.py
 ```
-
----
-
-## 🔗 Hugging Face Space & GitHub Sync
-
-To automatically sync your GitHub repository with Hugging Face Spaces (`https://huggingface.co/new-space?sdk=gradio`):
-
-1. **Create a Hugging Face Space**:
-   - Go to [huggingface.co/new-space](https://huggingface.co/new-space?sdk=gradio)
-   - Set Space Name: `EpiADR-Net`
-   - Select SDK: `Gradio`
-   - License: `MIT`
-2. **Add Hugging Face Secret to GitHub**:
-   - Get your Hugging Face Access Token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (Write permission).
-   - In GitHub repository settings -> Secrets and variables -> Actions -> Create repository secret named `HF_TOKEN`.
-3. **Automated Deployment**:
-   - Every `git push` to `main` branch will automatically sync to Hugging Face via `.github/workflows/huggingface_sync.yml`!
