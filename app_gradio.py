@@ -9,11 +9,13 @@ from utils import smiles_to_graph, highlight_toxic_subgraph
 from data_loader import GTEX_TISSUE_PROFILES, MEDDRA_ADR_CLASSES, ORGAN_NAMES, BENCHMARK_DRUGS
 from model import EpiADRNet
 
-# Optional spaces import for HF Zero-GPU runtime compatibility
+# Hugging Face Zero-GPU runtime compatibility decorator
 try:
     import spaces
-except ImportError:
-    spaces = None
+    gpu_decorator = spaces.GPU
+except Exception:
+    def gpu_decorator(fn):
+        return fn
 
 # Load model instance
 MODEL = EpiADRNet(in_features=5, hidden_dim=128, num_classes=10, dropout=0.2)
@@ -24,6 +26,7 @@ except Exception:
 MODEL.eval()
 
 
+@gpu_decorator
 def predict_single_organ(smiles: str, organ: str, mc_passes: int) -> Tuple[pd.DataFrame, str, Any]:
     """
     Predicts organ-conditioned ADR probabilities, epistemic uncertainty, and XAI toxic hotspots.
@@ -71,6 +74,7 @@ def predict_single_organ(smiles: str, organ: str, mc_passes: int) -> Tuple[pd.Da
     return df_res, xai_text, fig
 
 
+@gpu_decorator
 def compare_two_organs(smiles: str, organ_a: str, organ_b: str, mc_passes: int):
     """
     Compares ADR predictions between two distinct tissue profiles side-by-side.
@@ -186,4 +190,4 @@ with gr.Blocks(title="EpiADR-Net — Hugging Face Space", theme=gr.themes.Soft()
         )
 
 if __name__ == "__main__":
-    demo.queue().launch()
+    demo.queue().launch(ssr=False)
