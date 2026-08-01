@@ -4,7 +4,7 @@ emoji: 🧬
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: 4.44.0
+sdk_version: 5.16.0
 app_file: app_gradio.py
 pinned: false
 license: mit
@@ -17,7 +17,7 @@ license: mit
 [![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/jayantan/EpiADR-Net)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-2.0.0-green.svg)](https://fastapi.tiangolo.com/)
-[![Gradio](https://img.shields.io/badge/Gradio-4.44-orange.svg)](https://gradio.app/)
+[![Gradio](https://img.shields.io/badge/Gradio-5.16-orange.svg)](https://gradio.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **EpiADR-Net** is an end-to-end, publication-grade research platform and enterprise microservice stack engineered for **Tissue-Conditioned Zero-Shot Side Effect Disaggregation**. It predicts organ-specific Adverse Drug Reactions (ADRs) by conditioning molecular Graph Neural Network representations on human organ transcriptomic profiles.
