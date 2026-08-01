@@ -37,7 +37,10 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
                 hyb_val = int(atom.GetHybridization())
                 hyb = 1 if hyb_val == 2 else (2 if hyb_val == 3 else (3 if hyb_val == 4 else (4 if hyb_val == 5 else 0)))
                 aromatic = 1.0 if atom.GetIsAromatic() else 0.0
-                imp_val = float(atom.GetImplicitValence())
+                try:
+                    imp_val = float(atom.GetValence(Chem.ValenceType.IMPLICIT))
+                except Exception:
+                    imp_val = float(atom.GetImplicitValence())
                 in_ring = 1.0 if atom.IsInRing() else 0.0
                 mass = float(atom.GetMass()) / 100.0
                 chiral = 1.0 if atom.HasProp('_ChiralityPossible') or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED else 0.0
