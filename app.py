@@ -58,7 +58,7 @@ st.markdown("""
 # Load Local Model Instance
 @st.cache_resource
 def load_cached_model():
-    model = EpiADRNet(in_features=5, hidden_dim=128, num_classes=10, dropout=0.2)
+    model = EpiADRNet(in_features=10, hidden_dim=256, num_classes=10, dropout=0.3)
     try:
         model.load_state_dict(torch.load("model.pt", map_location=torch.device('cpu')))
     except Exception:

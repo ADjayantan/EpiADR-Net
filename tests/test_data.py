@@ -11,7 +11,7 @@ def test_smiles_to_graph():
     assert isinstance(node_feats, torch.Tensor)
     assert isinstance(edge_index, torch.Tensor)
     assert node_feats.ndim == 2
-    assert node_feats.shape[1] == 5  # 5 features per atom node
+    assert node_feats.shape[1] == 10  # 10 features per atom node
     assert edge_index.shape[0] == 2  # Source -> Target edges
     assert len(atom_symbols) == node_feats.shape[0]
 
@@ -31,7 +31,6 @@ def test_bemis_murcko_scaffold_split():
     assert len(train_idx) + len(val_idx) + len(test_idx) == len(dataset)
     assert len(set(train_idx).intersection(set(test_idx))) == 0
 
-    # Verify zero scaffold overlap
     train_scaffolds = set(get_bemis_murcko_scaffold(smiles_list[i]) for i in train_idx)
     test_scaffolds = set(get_bemis_murcko_scaffold(smiles_list[i]) for i in test_idx)
     assert len(train_scaffolds.intersection(test_scaffolds)) == 0

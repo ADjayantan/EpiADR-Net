@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 # Global Model Initialization
-MODEL = EpiADRNet(in_features=5, hidden_dim=128, num_classes=10, dropout=0.2)
+MODEL = EpiADRNet(in_features=10, hidden_dim=256, num_classes=10, dropout=0.3)
 MODEL_WEIGHTS_PATH = "model.pt"
 if os.path.exists(MODEL_WEIGHTS_PATH):
     try:

@@ -4,19 +4,24 @@ from typing import List, Tuple, Dict, Any
 import torch
 import numpy as np
 
-# Dictionary of standard atomic numbers and default valences for SMILES parsing fallback
 ATOM_NUMBERS = {'C': 6, 'N': 7, 'O': 8, 'F': 9, 'P': 15, 'S': 16, 'Cl': 17, 'Br': 35, 'I': 53, 'H': 1}
+ATOM_MASSES = {'C': 12.011, 'N': 14.007, 'O': 15.999, 'F': 18.998, 'P': 30.974, 'S': 32.06, 'Cl': 35.45, 'Br': 79.904, 'I': 126.90, 'H': 1.008}
 
 def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]:
     """
-    Converts a SMILES string into molecular graph node features X (N x 5) and edge index E (2 x M).
+    Converts a SMILES string into molecular graph node features X (N x 10) and edge index E (2 x M).
     
-    Node Features per Atom x_i in R^5:
+    Node Features per Atom x_i in R^10:
       1. Atomic Number
-      2. Atom Degree (# bonds)
+      2. Atom Degree (# explicit bonds)
       3. Formal Charge
-      4. Hybridization code (1=sp, 2=sp2, 3=sp3, 0=other)
-      5. Is Aromatic (1 or 0)
+      4. Hybridization Code (1=sp, 2=sp2, 3=sp3, 4=sp3d, 5=sp3d2, 0=other)
+      5. Is Aromatic (1.0 or 0.0)
+      6. Implicit Valence
+      7. Is In Ring (1.0 or 0.0)
+      8. Atomic Mass / 100.0 (normalized)
+      9. Is Stereocenter / Chiral Flag (1.0 or 0.0)
+      10. Total Hydrogen Count
     """
     try:
         from rdkit import Chem
@@ -30,9 +35,18 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
                 deg = atom.GetDegree()
                 chg = atom.GetFormalCharge()
                 hyb_val = int(atom.GetHybridization())
-                hyb = 1 if hyb_val == 2 else (2 if hyb_val == 3 else (3 if hyb_val == 4 else 0))
+                hyb = 1 if hyb_val == 2 else (2 if hyb_val == 3 else (3 if hyb_val == 4 else (4 if hyb_val == 5 else 0)))
                 aromatic = 1.0 if atom.GetIsAromatic() else 0.0
-                atoms.append([float(num), float(deg), float(chg), float(hyb), aromatic])
+                imp_val = float(atom.GetImplicitValence())
+                in_ring = 1.0 if atom.IsInRing() else 0.0
+                mass = float(atom.GetMass()) / 100.0
+                chiral = 1.0 if atom.HasProp('_ChiralityPossible') or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED else 0.0
+                h_count = float(atom.GetTotalNumHs())
+                
+                atoms.append([
+                    float(num), float(deg), float(chg), float(hyb), aromatic,
+                    imp_val, in_ring, mass, chiral, h_count
+                ])
                 atom_symbols.append(symbol)
             
             edges = []
@@ -43,7 +57,6 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
                 edges.append([j, i])
             
             if len(edges) == 0:
-                # Single atom molecule
                 edges = [[0, 0]]
                 
             node_feats = torch.tensor(atoms, dtype=torch.float32)
@@ -52,7 +65,7 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
     except Exception:
         pass
 
-    # High-reliability regex fallback parser for standard SMILES strings
+    # Regex fallback parser providing 10 feature values per atom
     tokens = re.findall(r'Cl|Br|[A-Z][a-z]?|[a-z]|[\=\#\-\+\(\)]', smiles)
     atoms = []
     atom_symbols = []
@@ -65,8 +78,21 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
             symbol = tok.upper()
             num = ATOM_NUMBERS.get(symbol, 6)
             is_aromatic = 1.0 if tok.islower() else 0.0
+            mass = ATOM_MASSES.get(symbol, 12.0) / 100.0
             idx = len(atoms)
-            atoms.append([float(num), 2.0 if is_aromatic else 1.0, 0.0, 2.0 if is_aromatic else 3.0, is_aromatic])
+            
+            atoms.append([
+                float(num),
+                2.0 if is_aromatic else 1.0,
+                0.0,
+                2.0 if is_aromatic else 3.0,
+                is_aromatic,
+                0.0,
+                is_aromatic,
+                mass,
+                0.0,
+                1.0
+            ])
             atom_symbols.append(symbol)
 
             if prev_idx is not None:
@@ -81,8 +107,7 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
                 prev_idx = stack.pop()
 
     if not atoms:
-        # Default placeholder for invalid inputs
-        atoms = [[6.0, 1.0, 0.0, 3.0, 0.0]]
+        atoms = [[6.0, 1.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.12, 0.0, 1.0]]
         atom_symbols = ['C']
         edges = [[0, 0]]
 
@@ -97,7 +122,6 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
 def get_bemis_murcko_scaffold(smiles: str) -> str:
     """
     Extracts the Bemis-Murcko scaffold from a SMILES string.
-    Returns core ring system + linkers, stripping side chains.
     """
     try:
         from rdkit import Chem
@@ -109,11 +133,9 @@ def get_bemis_murcko_scaffold(smiles: str) -> str:
     except Exception:
         pass
 
-    # Generic ring extraction fallback for SMILES strings
     rings = re.findall(r'c1[a-z0-9\=\#\-]+1|C1[A-Za-z0-9\=\#\-]+1', smiles)
     if rings:
         return "-".join(sorted(rings))
-    # If no rings, return carbon backbone framework template
     c_count = smiles.upper().count('C')
     return f"Framework_C{c_count}"
 
@@ -127,8 +149,7 @@ def bemis_murcko_scaffold_split(
     seed: int = 42
 ) -> Tuple[List[int], List[int], List[int]]:
     """
-    Splits dataset based on Bemis-Murcko scaffolds to guarantee ZERO structural overlap
-    between training, validation, and test sets.
+    Bemis-Murcko scaffold split ensuring zero structural overlap.
     """
     scaffolds = {}
     for idx, smiles in enumerate(smiles_list):
@@ -137,7 +158,6 @@ def bemis_murcko_scaffold_split(
             scaffolds[scaffold] = []
         scaffolds[scaffold].append(idx)
 
-    # Sort scaffold clusters by size (largest first) for deterministic distribution
     scaffold_sets = sorted(scaffolds.values(), key=lambda x: len(x), reverse=True)
     
     rng = random.Random(seed)
@@ -168,7 +188,7 @@ def random_split(
     seed: int = 42
 ) -> Tuple[List[int], List[int], List[int]]:
     """
-    Standard random dataset split baseline.
+    Random dataset split baseline.
     """
     indices = list(range(len(dataset)))
     rng = random.Random(seed)
@@ -188,13 +208,11 @@ def random_split(
 def highlight_toxic_subgraph(smiles: str, attention_scores: torch.Tensor, top_k: int = 3) -> Dict[str, Any]:
     """
     Extracts top-k toxic atomic subgraphs based on Layer 4 GAT attention weights.
-    Returns atomic indices, symbols, and importance scores for XAI visualization.
     """
     node_feats, edge_index, atom_symbols = smiles_to_graph(smiles)
     num_nodes = len(atom_symbols)
     
     if attention_scores is None or len(attention_scores) == 0:
-        # Uniform fallback attention if not provided
         scores = np.ones(num_nodes) / max(num_nodes, 1)
     else:
         scores = attention_scores.detach().cpu().numpy()
@@ -203,7 +221,6 @@ def highlight_toxic_subgraph(smiles: str, attention_scores: torch.Tensor, top_k:
         elif len(scores) > num_nodes:
             scores = scores[:num_nodes]
             
-    # Normalize scores between 0 and 1
     max_score = np.max(scores) if np.max(scores) > 0 else 1.0
     norm_scores = scores / max_score
 

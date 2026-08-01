@@ -18,7 +18,7 @@ except Exception:
         return fn
 
 # Load model instance
-MODEL = EpiADRNet(in_features=5, hidden_dim=128, num_classes=10, dropout=0.2)
+MODEL = EpiADRNet(in_features=10, hidden_dim=256, num_classes=10, dropout=0.3)
 try:
     MODEL.load_state_dict(torch.load("model.pt", map_location=torch.device('cpu')))
 except Exception:
