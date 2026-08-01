@@ -11,8 +11,8 @@ from model import EpiADRNet
 
 app = FastAPI(
     title="EpiADR-Net REST Microservice API",
-    description="Enterprise API for Tissue-Conditioned Zero-Shot Adverse Drug Reaction (ADR) Disaggregation",
-    version="2.0.0",
+    description="Enterprise API for Tissue-Conditioned Zero-Shot Adverse Drug Reaction (ADR) Disaggregation — v3",
+    version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -26,8 +26,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Model Initialization
-MODEL = EpiADRNet(in_features=10, hidden_dim=256, num_classes=10, dropout=0.3)
+# Global Model Initialization — EpiADR-Net v3
+MODEL = EpiADRNet(
+    in_features=17, hidden_dim=512, tissue_dim=256,
+    num_classes=10, num_gat_layers=6, num_heads=8, dropout=0.3,
+)
 MODEL_WEIGHTS_PATH = "model.pt"
 if os.path.exists(MODEL_WEIGHTS_PATH):
     try:
@@ -40,7 +43,7 @@ if os.path.exists(MODEL_WEIGHTS_PATH):
 # Pydantic Schemas
 class PredictionRequest(BaseModel):
     smiles: str = Field(..., json_schema_extra={"example": "CC(=O)NC1=CC=C(O)C=C1"}, description="Valid molecular SMILES string")
-    organ: str = Field(..., json_schema_extra={"example": "Liver"}, description="Target human tissue profile (Liver, Heart, Brain, Kidney, Lung)")
+    organ: str = Field(..., json_schema_extra={"example": "Liver"}, description="Target human tissue profile (Liver, Heart, Brain, Kidney, Lung, Pancreas, Spleen, Intestine, Skin, Bone_Marrow)")
     mc_samples: Optional[int] = Field(20, ge=5, le=50, description="Monte Carlo Dropout sample passes")
 
 class ExplainRequest(BaseModel):
@@ -58,7 +61,8 @@ def root():
     return {
         "status": "online",
         "service": "EpiADR-Net REST Microservice",
-        "version": "2.0.0",
+        "version": "3.0.0",
+        "architecture": "6-Layer GAT | 8-Head | 512-dim | 17 atom features",
         "documentation": "/docs"
     }
 
@@ -74,7 +78,7 @@ def health_check():
 
 @app.get("/organs", tags=["Reference Metadata"])
 def get_supported_organs():
-    return {"supported_organs": ORGAN_NAMES, "vector_dimension": 128}
+    return {"supported_organs": ORGAN_NAMES, "vector_dimension": 256}
 
 @app.get("/adr-classes", tags=["Reference Metadata"])
 def get_adr_classes():
@@ -90,7 +94,7 @@ def predict_adr(req: PredictionRequest):
         batch = torch.zeros(node_feats.size(0), dtype=torch.long)
         tissue_vec = GTEX_TISSUE_PROFILES[req.organ].unsqueeze(0)
 
-        mc_res = MODEL.predict_mc_dropout(node_feats, edge_index, batch, tissue_vec, num_samples=req.mc_samples)
+        mc_res = MODEL.predict_mc_dropout(node_feats, edge_index, batch, tissue_vec, num_samples=req.mc_samples or 30)
         
         mu = mc_res["mean_probabilities"][0].cpu().numpy()
         sigma = mc_res["uncertainty_sigma"][0].cpu().numpy()
