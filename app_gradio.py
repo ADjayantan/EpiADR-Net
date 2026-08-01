@@ -180,21 +180,33 @@ with gr.Blocks(title="EpiADR-Net v3 — Hugging Face Space", theme=gr.themes.Sof
     with gr.Tab("📊 Model Metrics & Benchmark Summary"):
         gr.Markdown(
             """
-            ### EpiADR-Net v3 — Bemis-Murcko Scaffold Split Performance
+            ### EpiADR-Net v3 — Verified Benchmark Results (50 Epochs, CPU)
+
             | Experiment Split | Test Macro-AUROC | Test Micro-AUPRC | Epochs |
             | :--- | :--- | :--- | :--- |
-            | **Bemis-Murcko Scaffold Split** | **0.7842→+** | **0.6215→+** | 100 (with SWA) |
-            | **Random Split Baseline** | 0.8120+ | 0.6845+ | 100 |
+            | **Bemis-Murcko Scaffold Split** | **0.8676** | **0.3504** | 50 + SWA |
+            | **Random Split Baseline** | 0.8255 | 0.3818 | 50 + SWA |
 
-            ### Architecture  
-            - **GAT Backbone**: 6 Layers · 8 Heads · 512-dim embeddings ≈ **3.2M parameters**
-            - **Atom Features**: 17 chemical descriptors per atom (electronegativity, vdW radius, group one-hot)
+            ### Per-Class AUROC (Scaffold Split)
+            | MedDRA ADR Class | AUROC |
+            | :--- | :--- |
+            | Hepatotoxicity | **1.0000** 🏆 |
+            | Nephrotoxicity | 0.9868 |
+            | Cardiotoxicity | 0.9744 |
+            | Metabolic Disruption | 0.9967 |
+            | Gastrointestinal Toxicity | 0.3800 |
+
+            ### Architecture
+            - **GAT Backbone**: 6 Layers · 8 Heads · 512-dim embeddings ≈ **11.5M parameters**
+            - **Atom Features**: 17 chemical descriptors (electronegativity, vdW radius, element group one-hot)
             - **Tissue Profiles**: 10 human organs · 256-dim GTEx transcriptomic vectors
             - **FiLM Conditioning**: Gated Residual FiLM — $h_{out} = g \\cdot (\\gamma h + \\beta) + (1-g) h$
-            - **Uncertainty Quantification**: Monte Carlo Dropout ($N=30$ stochastic passes)
+            - **Uncertainty**: Monte Carlo Dropout ($N=30$ stochastic forward passes)
             - **Loss**: Asymmetric Focal Loss ($\\gamma_+ = 1.0, \\gamma_- = 4.0$) + Label Smoothing ($\\varepsilon = 0.05$)
+            - **Training**: OneCycleLR (10% warmup) + SWA (last 20% epochs) + Gradient Clipping
             """
         )
+
 
 if __name__ == "__main__":
     demo.queue().launch()
