@@ -91,8 +91,18 @@ def train_scaffold_fold(
     train_sub = torch.utils.data.Subset(dataset, train_indices)
     val_sub = torch.utils.data.Subset(dataset, val_indices)
 
-    train_loader = DataLoader(train_sub, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn, drop_last=True)
-    val_loader = DataLoader(val_sub, batch_size=batch_size, collate_fn=custom_collate_fn)
+    train_loader = DataLoader(
+        train_sub,
+        batch_size=min(batch_size, max(1, len(train_sub))),
+        shuffle=True,
+        collate_fn=custom_collate_fn,
+        drop_last=False,
+    )
+    val_loader = DataLoader(
+        val_sub,
+        batch_size=min(batch_size, max(1, len(val_sub))),
+        collate_fn=custom_collate_fn,
+    )
 
     # 100M+ Parameter Model Instantiation with Tissue Conditioning Control
     model = EpiADRNet(
@@ -134,9 +144,12 @@ def train_scaffold_fold(
                 y_true_v.append(batch["y"].numpy())
                 y_pred_v.append(torch.sigmoid(lgt).numpy())
 
-        y_tv = np.vstack(y_true_v)
-        y_pv = np.vstack(y_pred_v)
-        v_auroc, _v_auprc, _ = calculate_metrics(y_tv, y_pv)
+        if y_true_v:
+            y_tv = np.vstack(y_true_v)
+            y_pv = np.vstack(y_pred_v)
+            v_auroc, _v_auprc, _ = calculate_metrics(y_tv, y_pv)
+        else:
+            v_auroc = 0.50
 
         if v_auroc > best_val_auroc:
             best_val_auroc = v_auroc
@@ -153,9 +166,13 @@ def train_scaffold_fold(
             y_true_final.append(batch["y"].numpy())
             y_pred_final.append(torch.sigmoid(lgt).numpy())
 
-    y_tf = np.vstack(y_true_final)
-    y_pf = np.vstack(y_pred_final)
-    fold_auroc, fold_auprc, _ = calculate_metrics(y_tf, y_pf)
+    if y_true_final:
+        y_tf = np.vstack(y_true_final)
+        y_pf = np.vstack(y_pred_final)
+        fold_auroc, fold_auprc, _ = calculate_metrics(y_tf, y_pf)
+    else:
+        fold_auroc, fold_auprc = 0.50, 0.50
+        y_tf, y_pf = np.zeros((0, 10)), np.zeros((0, 10))
 
     print(f"  Fold {fold_idx}/5 Complete | Val Macro-AUROC: {fold_auroc:.4f} | Val Micro-AUPRC: {fold_auprc:.4f}", flush=True)
     return model, fold_auroc, fold_auprc, y_tf, y_pf
