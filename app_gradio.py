@@ -120,12 +120,16 @@ def compare_two_organs(smiles: str, organ_a: str, organ_b: str, mc_passes: int):
 
 
 # Build Gradio Interface
-with gr.Blocks(title="EpiADR-Net v5 — Hugging Face Space") as demo:
+with gr.Blocks(title="EpiADR-Net v5 — Clinical & Biological Research Platform") as demo:
     gr.Markdown(
         """
         # 🧬 EpiADR-Net v5: 100M+ Parameter Foundation ADR Platform (96.80% AUROC)
         ### 116.5M Parameters · 12-Layer Graph Transformer · SwiGLU FFN · 1024-dim GTEx · 150+ FDA Drugs · 5-Fold Ensemble
         [GitHub Repository](https://github.com/ADjayantan/EpiADR-Net) | [IEEE/ACM Manuscript](https://github.com/ADjayantan/EpiADR-Net/blob/main/MANUSCRIPT.md)
+
+        > 🩺 **RESTRICTED RESEARCH ACCESS — FOR MEDICAL DOCTORS, PHARMACOLOGISTS & BIOLOGICAL RESEARCHERS ONLY**
+        > 
+        > ⚠️ **Clinical & Pharmacological Disclaimer**: This analytical engine generates in-silico computational predictions of organ-conditioned Adverse Drug Reactions (ADRs) based on GTEx V8 transcriptomic expression vectors and molecular graph representations. This analysis is **strictly reserved for certified Medical Doctors, Clinical Pharmacologists, Toxicologists, and Biological Researchers**. It is not designed for patient self-diagnosis or unverified clinical decisions.
         """
     )
 
@@ -168,6 +172,7 @@ with gr.Blocks(title="EpiADR-Net v5 — Hugging Face Space") as demo:
         )
 
     with gr.Tab("⚖️ Dual Organ Comparative Analysis"):
+        gr.Markdown("🔒 **Clinical & Biological Research Notice**: *This comparative disaggregation matrix is restricted to Medical Doctors, Pharmacologists & Biological Researchers.*")
         with gr.Row():
             comp_smiles = gr.Textbox(label="SMILES String", value="CC(=O)NC1=CC=C(O)C=C1")
             comp_organ_a = gr.Dropdown(choices=ORGAN_NAMES, value="Liver", label="Tissue Profile A")

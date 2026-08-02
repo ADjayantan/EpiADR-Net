@@ -35,6 +35,11 @@ export const Header: React.FC<HeaderProps> = ({
             <Database className="w-3.5 h-3.5 text-cyan-400" />
             <span>SIDER 4.1 (7,325 ADRs) & GTEx V8 Transcriptomics</span>
           </span>
+          <span className="hidden xl:inline-block text-slate-600">|</span>
+          <span className="hidden xl:flex items-center space-x-1.5 bg-rose-950/60 text-rose-300 px-2.5 py-0.5 rounded-full border border-rose-800/60 text-[11px] font-semibold">
+            <ShieldCheck className="w-3 h-3 text-rose-400" />
+            <span>Restricted: For Medical Doctors & Biological Researchers Only</span>
+          </span>
         </div>
 
         <div className="flex items-center space-x-3">
