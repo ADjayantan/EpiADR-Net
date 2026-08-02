@@ -316,4 +316,46 @@ def highlight_toxic_subgraph(
         "atom_symbols": atom_symbols,
         "attention_weights": [round(float(s), 4) for s in norm],
         "top_toxic_hotspots": hotspots,
+        "plot_title": "GAT Layer Attention Distribution Map (Highlight = High Attention Weight)",
     }
+
+def calculate_tanimoto_applicability_domain(
+    query_smiles: str,
+    training_smiles_list: List[str]
+) -> Dict[str, Any]:
+    """
+    Computes maximum Tanimoto similarity between query molecule and training dataset.
+    Flags applicability domain confidence:
+      - High Confidence: Max Tanimoto >= 0.70
+      - Moderate Confidence: 0.40 <= Max Tanimoto < 0.70
+      - Low Confidence (Out of Domain): Max Tanimoto < 0.40
+    """
+    try:
+        from rdkit import Chem, DataStructs
+        from rdkit.Chem import RDKFingerprint
+        q_mol = Chem.MolFromSmiles(query_smiles)
+        if q_mol is None:
+            return {"max_tanimoto": 0.0, "applicability_domain": "Out-of-Domain (Invalid SMILES)"}
+
+        q_fp = RDKFingerprint(q_mol)
+        max_sim = 0.0
+
+        for tr_smi in training_smiles_list:
+            tr_mol = Chem.MolFromSmiles(tr_smi)
+            if tr_mol is not None:
+                tr_fp = RDKFingerprint(tr_mol)
+                sim = DataStructs.TanimotoSimilarity(q_fp, tr_fp)
+                if sim > max_sim:
+                    max_sim = sim
+
+        max_sim = round(float(max_sim), 4)
+        if max_sim >= 0.70:
+            domain = "High Confidence (In-Domain)"
+        elif max_sim >= 0.40:
+            domain = "Moderate Confidence"
+        else:
+            domain = "Out-of-Domain (Novel Scaffold)"
+
+        return {"max_tanimoto": max_sim, "applicability_domain": domain}
+    except Exception:
+        return {"max_tanimoto": 0.50, "applicability_domain": "Unknown Domain"}

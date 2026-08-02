@@ -202,10 +202,12 @@ class EpiADRNet(nn.Module):
         num_heads: int = 16,
         dropout: float = 0.1,
         edge_dropout: float = 0.05,
+        use_tissue_conditioning: bool = True,
     ):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
+        self.use_tissue_conditioning = use_tissue_conditioning
 
         # Input Projection
         self.input_proj = nn.Sequential(
@@ -324,8 +326,9 @@ class EpiADRNet(nn.Module):
             h = self.mc_dropout(h)
             last_alpha = alpha
 
-        # Bi-Directional Gene Pathway Cross-Attention
-        h = self.gene_cross_attn(h, tissue_vec, batch)
+        # Bi-Directional Gene Pathway Cross-Attention (Skipped if use_tissue_conditioning=False)
+        if self.use_tissue_conditioning:
+            h = self.gene_cross_attn(h, tissue_vec, batch)
 
         # Hierarchical Pooling
         graph_emb = self._hierarchical_pool(h, batch, num_graphs)

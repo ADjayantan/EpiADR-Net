@@ -42,9 +42,8 @@ Dual Graph Pooling      ─────────► [Mean || Max]   : [B, 256
 | :--- | :--- | :--- | :--- |
 | **Input Linear** | `[N, 5]` | `[N, 128]` | $W_{\text{in}} \in \mathbb{R}^{5 \times 128}$, Bias |
 | **GAT Layer 1-4** | `[N, 128]` | `[N, 128]` | $W_{\text{gat}} \in \mathbb{R}^{128 \times 128}, a \in \mathbb{R}^{256 \times 1}$, LeakyReLU |
-| **FiLM MLP Gamma** | `[B, 128]` | `[B, 128]` | Linear(128->128) -> ReLU -> Linear(128->128) |
-| **FiLM MLP Beta** | `[B, 128]` | `[B, 128]` | Linear(128->128) -> ReLU -> Linear(128->128) |
-| **FiLM Modulation**| `[N, 128]` | `[N, 128]` | $h_i^{\text{cond}} = \gamma_{\text{nodes}} \odot h_i + \beta_{\text{nodes}}$ |
+| **Gene Pathway Cross-Attn**| `[N, 1536]` | `[N, 1536]` | $\text{MultiHeadCrossAttn}(\mathbf{Q}_{1536}, \mathbf{K}_{1024}, \mathbf{V}_{1024})$ |
+| **FiLM Residual Update** | `[N, 1536]` | `[N, 1536]` | $h_i^{\text{cond}} = h_i \odot (1.0 + \gamma_{\text{nodes}}) + \beta_{\text{nodes}}$ |
 | **Dual Graph Pool**| `[N, 128]` | `[B, 256]` | MeanPool `[B, 128]` \|\| MaxPool `[B, 128]` |
 | **Classifier FC1** | `[B, 256]` | `[B, 128]` | Linear(256->128), ReLU, Dropout(0.2) |
 | **Classifier FC2** | `[B, 128]` | `[B, 10]` | Linear(128->10) |
