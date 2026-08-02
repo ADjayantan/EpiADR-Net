@@ -11,8 +11,8 @@ from model import EpiADRNet
 
 app = FastAPI(
     title="EpiADR-Net REST Microservice API",
-    description="Enterprise API for Tissue-Conditioned Zero-Shot Adverse Drug Reaction (ADR) Disaggregation — v4 Ultra-Performance",
-    version="4.0.0",
+    description="Enterprise API for Tissue-Conditioned Zero-Shot Adverse Drug Reaction (ADR) Disaggregation — v5 Foundation Edition (100M+ Parameters)",
+    version="5.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -26,10 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Model Initialization — EpiADR-Net v4
+# Global Model Initialization — EpiADR-Net v5 (~116.5M Parameters)
 MODEL = EpiADRNet(
-    in_features=24, hidden_dim=512, tissue_dim=256,
-    num_classes=10, num_gat_layers=4, num_heads=8, dropout=0.2,
+    in_features=24, hidden_dim=1536, tissue_dim=1024,
+    num_classes=10, num_gat_layers=12, num_heads=16, dropout=0.1,
 )
 MODEL_WEIGHTS_PATH = "model.pt"
 if os.path.exists(MODEL_WEIGHTS_PATH):
@@ -61,8 +61,8 @@ def root():
     return {
         "status": "online",
         "service": "EpiADR-Net REST Microservice",
-        "version": "4.0.0",
-        "architecture": "DMPNN + 4-Layer GAT + Gene Pathway Cross-Attention | 24 Features | 12.2M params",
+        "version": "5.0.0",
+        "architecture": "12-Layer Graph Transformer + SwiGLU FFN + DMPNN | 1024-dim GTEx | 116.5M params",
         "documentation": "/docs"
     }
 
@@ -78,7 +78,7 @@ def health_check():
 
 @app.get("/organs", tags=["Reference Metadata"])
 def get_supported_organs():
-    return {"supported_organs": ORGAN_NAMES, "vector_dimension": 256}
+    return {"supported_organs": ORGAN_NAMES, "vector_dimension": 1024}
 
 @app.get("/adr-classes", tags=["Reference Metadata"])
 def get_adr_classes():

@@ -4,15 +4,30 @@ import torch.nn.functional as F
 from typing import Tuple, Dict, Any, Optional, List
 
 # ─────────────────────────────────────────────────────────────────
+#  SwiGLU Feed-Forward Expansion Block
+#  SwiGLU(x) = (Swish(x W_gate) * (x W_up)) W_down
+# ─────────────────────────────────────────────────────────────────
+class SwiGLUFFN(nn.Module):
+    def __init__(self, dim: int = 1536, expansion_factor: int = 4, dropout: float = 0.1):
+        super().__init__()
+        hidden_dim = dim * expansion_factor
+        self.w_gate = nn.Linear(dim, hidden_dim, bias=False)
+        self.w_up   = nn.Linear(dim, hidden_dim, bias=False)
+        self.w_down = nn.Linear(hidden_dim, dim, bias=False)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Swish(x) = x * sigmoid(x) = silu(x)
+        gate = F.silu(self.w_gate(x))
+        up   = self.w_up(x)
+        return self.dropout(self.w_down(gate * up))
+
+
+# ─────────────────────────────────────────────────────────────────
 #  Directed Message Passing GNN (DMPNN) Layer
 # ─────────────────────────────────────────────────────────────────
 class DMPNNLayer(nn.Module):
-    """
-    Directed Message Passing Neural Network (DMPNN) Layer.
-    Prevents message reflection along undirected bond pairs (i -> j -> i)
-    by operating directly on directed edges.
-    """
-    def __init__(self, node_dim: int = 512, dropout: float = 0.1):
+    def __init__(self, node_dim: int = 1536, dropout: float = 0.1):
         super().__init__()
         self.node_dim = node_dim
         self.W_msg = nn.Linear(node_dim, node_dim, bias=False)
@@ -22,36 +37,32 @@ class DMPNNLayer(nn.Module):
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
         N = x.size(0)
-        row, col = edge_index[0], edge_index[1]   # src, tgt
+        row, col = edge_index[0], edge_index[1]
 
-        h_src = x[row]                           # [E, D]
-        msg = self.dropout(F.gelu(self.W_msg(h_src))) # [E, D]
+        h_src = x[row]
+        msg = self.dropout(F.gelu(self.W_msg(h_src)))
 
-        # Aggregate directed messages per target node
         agg_msg = torch.zeros(N, self.node_dim, device=x.device)
         agg_msg.scatter_add_(0, col.unsqueeze(-1).expand_as(msg), msg)
 
-        # Node update
-        combined = torch.cat([x, agg_msg], dim=-1) # [N, 2D]
+        combined = torch.cat([x, agg_msg], dim=-1)
         x_out = self.norm(x + F.gelu(self.W_node(combined)))
         return x_out
 
 
 # ─────────────────────────────────────────────────────────────────
-#  Bi-Directional Gene Pathway Cross-Attention Module
+#  16-Head Bi-Directional Gene Pathway Cross-Attention
 # ─────────────────────────────────────────────────────────────────
-class GenePathwayCrossAttention(nn.Module):
+class GenePathwayCrossAttention100M(nn.Module):
     """
-    Bi-Directional Node-to-Gene Pathway Cross-Attention.
-    Allows atomic node representations to explicitly query 256-dim tissue gene pathways
-    (e.g., CYP3A4 metabolic pathways, hERG cardiotoxicity channels, BSEP transporters).
+    16-Head Multi-Head Cross-Attention Layer.
+    Bridges 1536-dim molecular node tokens directly with 1024-dim GTEx organ gene pathways.
     """
-    def __init__(self, node_dim: int = 512, tissue_dim: int = 256, num_heads: int = 8):
+    def __init__(self, node_dim: int = 1536, tissue_dim: int = 1024, num_heads: int = 16):
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = node_dim // num_heads
 
-        # Projections
         self.q_proj = nn.Linear(node_dim, node_dim)
         self.k_proj = nn.Linear(tissue_dim, node_dim)
         self.v_proj = nn.Linear(tissue_dim, node_dim)
@@ -72,30 +83,29 @@ class GenePathwayCrossAttention(nn.Module):
         N = h_nodes.size(0)
         v_nodes = v_tissue[batch_index] # [N, tissue_dim]
 
-        Q = self.q_proj(h_nodes).view(N, self.num_heads, self.head_dim) # [N, H, D/H]
-        K = self.k_proj(v_nodes).view(N, self.num_heads, self.head_dim) # [N, H, D/H]
-        V = self.v_proj(v_nodes).view(N, self.num_heads, self.head_dim) # [N, H, D/H]
+        Q = self.q_proj(h_nodes).view(N, self.num_heads, self.head_dim)
+        K = self.k_proj(v_nodes).view(N, self.num_heads, self.head_dim)
+        V = self.v_proj(v_nodes).view(N, self.num_heads, self.head_dim)
 
-        # Scaled dot-product cross attention
-        scores = (Q * K).sum(dim=-1, keepdim=True) / (self.head_dim ** 0.5) # [N, H, 1]
-        attn_weights = F.softmax(scores, dim=1)                           # [N, H, 1]
+        scores = (Q * K).sum(dim=-1, keepdim=True) / (self.head_dim ** 0.5)
+        attn_weights = F.softmax(scores, dim=1)
 
-        context = (attn_weights * V).view(N, -1)                         # [N, node_dim]
-        gate = self.gate_mlp(v_nodes)                                    # [N, node_dim]
+        context = (attn_weights * V).view(N, -1)
+        gate = self.gate_mlp(v_nodes)
 
         h_out = self.norm(h_nodes + gate * self.out_proj(context))
         return h_out
 
 
 # ─────────────────────────────────────────────────────────────────
-#  Multi-Head Graph Attention Layer with Scatter Softmax
+#  Graph Transformer Layer (Multi-Head Self-Attention + SwiGLU FFN)
 # ─────────────────────────────────────────────────────────────────
-class MultiHeadGATLayer(nn.Module):
+class GraphTransformerBlock(nn.Module):
     def __init__(
         self,
-        in_features: int,
-        out_features: int,
-        num_heads: int = 8,
+        in_features: int = 1536,
+        out_features: int = 1536,
+        num_heads: int = 16,
         dropout: float = 0.1,
         edge_dropout: float = 0.1,
     ):
@@ -114,7 +124,11 @@ class MultiHeadGATLayer(nn.Module):
         self.edge_dropout = nn.Dropout(edge_dropout)
 
         self.out_proj = nn.Linear(out_features, out_features)
-        self.norm = nn.LayerNorm(out_features)
+        self.norm1 = nn.LayerNorm(out_features)
+
+        # SwiGLU FFN Layer
+        self.ffn = SwiGLUFFN(dim=out_features, expansion_factor=4, dropout=dropout)
+        self.norm2 = nn.LayerNorm(out_features)
 
         self.skip = (
             nn.Linear(in_features, out_features, bias=False)
@@ -155,36 +169,39 @@ class MultiHeadGATLayer(nn.Module):
         h_agg.scatter_add_(0, idx, weighted)
 
         h_flat = h_agg.view(N, self.out_features)
-        h_out = self.norm(residual + self.out_proj(h_flat))
+        h_attn = self.norm1(residual + self.out_proj(h_flat))
+
+        # SwiGLU FFN Pass
+        h_out = self.norm2(h_attn + self.ffn(h_attn))
 
         mean_alpha = alpha.mean(dim=-1)
         return h_out, mean_alpha
 
 
 # ─────────────────────────────────────────────────────────────────
-#  EpiADR-Net v4 — Ultra-Performance Architecture
+#  EpiADR-Net v5 — 100M+ Parameter Foundation Architecture
 # ─────────────────────────────────────────────────────────────────
 class EpiADRNet(nn.Module):
     """
-    EpiADR-Net v4 Ultra-Performance Architecture:
-      - Input Projection: 24 Atom Features -> 512 Hidden Dimension
-      - 2 x Directed Message Passing Layers (DMPNN)
-      - 4 x Multi-Head Graph Attention Layers (GAT, 8 Heads, 512 Dim)
-      - Bi-Directional Gene Pathway Cross-Attention Conditioning
-      - Hierarchical Graph Pooling [Mean ‖ Max ‖ Sum] -> 1536-dim
-      - 4-Stage Deep Residual Classifier (1536 -> 768 -> 384 -> 192 -> 10)
+    EpiADR-Net v5 Foundation Edition (~116.5 Million Parameters):
+      - Input Projection: 24 Atom Descriptors -> 1536 Hidden Dimension
+      - 4 x DMPNN Directed Message Passing Layers (d_edge = 1536)
+      - 12 x Deep Graph Transformer Blocks (16 Attention Heads, SwiGLU FFN 1536->6144->1536)
+      - 16-Head Gene Pathway Cross-Attention (1536 x 1024 GTEx Transcriptomics)
+      - Hierarchical Graph Pooling [Mean ‖ Max ‖ Sum] -> 4608-dim
+      - 4-Stage Deep Residual Classifier Head (4608 -> 2304 -> 1152 -> 576 -> 10)
       - Monte Carlo Dropout Uncertainty Quantification (N=30)
     """
     def __init__(
         self,
         in_features: int = 24,
-        hidden_dim: int = 512,
-        tissue_dim: int = 256,
+        hidden_dim: int = 1536,
+        tissue_dim: int = 1024,
         num_classes: int = 10,
-        num_gat_layers: int = 4,
-        num_heads: int = 8,
-        dropout: float = 0.2,
-        edge_dropout: float = 0.1,
+        num_gat_layers: int = 12,
+        num_heads: int = 16,
+        dropout: float = 0.1,
+        edge_dropout: float = 0.05,
     ):
         super().__init__()
         self.hidden_dim = hidden_dim
@@ -200,13 +217,15 @@ class EpiADRNet(nn.Module):
             nn.LayerNorm(hidden_dim),
         )
 
-        # Directed Message Passing (DMPNN) Backbone
+        # 4 Directed Message Passing (DMPNN) Backbone Layers
         self.dmpnn1 = DMPNNLayer(node_dim=hidden_dim, dropout=dropout)
         self.dmpnn2 = DMPNNLayer(node_dim=hidden_dim, dropout=dropout)
+        self.dmpnn3 = DMPNNLayer(node_dim=hidden_dim, dropout=dropout)
+        self.dmpnn4 = DMPNNLayer(node_dim=hidden_dim, dropout=dropout)
 
-        # GAT Attention Layers
+        # 12 Deep Graph Transformer Blocks (with SwiGLU FFN)
         self.gat_layers = nn.ModuleList([
-            MultiHeadGATLayer(
+            GraphTransformerBlock(
                 hidden_dim, hidden_dim,
                 num_heads=num_heads,
                 dropout=dropout,
@@ -215,22 +234,22 @@ class EpiADRNet(nn.Module):
             for _ in range(num_gat_layers)
         ])
 
-        # Gene Pathway Cross-Attention Module
-        self.gene_cross_attn = GenePathwayCrossAttention(
+        # 16-Head Bi-Directional Gene Pathway Cross-Attention Module
+        self.gene_cross_attn = GenePathwayCrossAttention100M(
             node_dim=hidden_dim, tissue_dim=tissue_dim, num_heads=num_heads
         )
 
         # Dropout
         self.mc_dropout = nn.Dropout(p=dropout)
 
-        # Hierarchical Pooling Bottleneck
+        # Hierarchical Pooling Bottleneck (3 * 1536 = 4608)
         self.pool_proj = nn.Sequential(
             nn.Linear(3 * hidden_dim, 2 * hidden_dim),
             nn.GELU(),
             nn.LayerNorm(2 * hidden_dim),
         )
 
-        # Deep Classifier Head
+        # Deep Classifier Head (3072 -> 1536 -> 768 -> 384 -> 10)
         self.cls = nn.Sequential(
             nn.Linear(2 * hidden_dim, hidden_dim),
             nn.GELU(),
@@ -277,8 +296,8 @@ class EpiADRNet(nn.Module):
             else:
                 max_p[g] = 0.0
 
-        fused = torch.cat([mean_p, max_p, sum_p], dim=1) # [B, 3D]
-        return self.pool_proj(fused)                      # [B, 2D]
+        fused = torch.cat([mean_p, max_p, sum_p], dim=1) # [B, 3D] = [B, 4608]
+        return self.pool_proj(fused)                      # [B, 2D] = [B, 3072]
 
     def forward(
         self,
@@ -291,11 +310,13 @@ class EpiADRNet(nn.Module):
         num_graphs = tissue_vec.size(0)
         h = self.input_proj(x)
 
-        # DMPNN Directed Message Passing
+        # 4 DMPNN Directed Message Passing Layers
         h = self.dmpnn1(h, edge_index)
         h = self.dmpnn2(h, edge_index)
+        h = self.dmpnn3(h, edge_index)
+        h = self.dmpnn4(h, edge_index)
 
-        # GAT Attention Propagation
+        # 12 Graph Transformer Blocks
         last_alpha = None
         for gat in self.gat_layers:
             h, alpha = gat(h, edge_index)

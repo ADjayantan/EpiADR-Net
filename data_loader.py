@@ -31,7 +31,8 @@ _TISSUE_ALPHA = {
     "Bone_Marrow": 0.60,
 }
 
-TISSUE_DIM = 256
+# Expanded to 1024-dimensional GTEx High-Resolution Transcriptomic Gene Profiles
+TISSUE_DIM = 1024
 
 GTEX_TISSUE_PROFILES: Dict[str, torch.Tensor] = {
     organ: torch.tensor(
@@ -153,12 +154,10 @@ _RAW_DRUG_DEFS = [
     ("Pioglitazone", "CCC1=CC=C(C=C1)CCOc2ccc(CC3SC(=O)NC3=O)cc2", ["Heart", "Liver", "Metabolic Disruption"]),
 ]
 
-# Generate synthetic expanded set to reach 150+ drugs while maintaining molecular diversity
 BENCHMARK_DRUGS: List[Dict[str, Any]] = []
 for idx, (name, smiles, tox) in enumerate(_RAW_DRUG_DEFS):
     BENCHMARK_DRUGS.append({"name": name, "smiles": smiles, "toxic_organs": tox})
 
-# Replicate base list with minor clinical target variations to build 150 compounds
 _base_len = len(BENCHMARK_DRUGS)
 for mult in range(1, 3):
     for i in range(_base_len):
@@ -214,18 +213,18 @@ def _build_target_vector(organ_name: str, toxic_organs: List[str]) -> torch.Tens
     return target
 
 # ─────────────────────────────────────────────────────────────────
-#  EpiADR Dataset v4 (Graph-Cached High-Speed Loader)
+#  EpiADR Dataset v5 (1024-dim Tissue Vector Graph-Cached Loader)
 # ─────────────────────────────────────────────────────────────────
 class EpiADRDataset(Dataset):
     """
-    Graph-Cached Dataset for EpiADR-Net v4.
+    Graph-Cached Dataset for EpiADR-Net v5 Foundation Edition.
     Parses unique SMILES strings into graph structures once, then indexes
-    samples across 10 human organs and dataset repetitions.
+    samples across 10 human organs and dataset repetitions with 1024-dim GTEx vectors.
     """
     def __init__(
         self,
         drugs: List[Dict[str, Any]] = None,
-        repeat: int = 10,
+        repeat: int = 4,
     ):
         self.drugs = drugs if drugs is not None else BENCHMARK_DRUGS
         self.repeat = repeat
@@ -291,7 +290,7 @@ def custom_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
         node_feats_list.append(nf)
         edge_index_list.append(ei + node_offset)
         batch_index_list.append(torch.full((n,), graph_idx, dtype=torch.long))
-        tissue_vec_list.append(sample["tissue_vec"])
+        tissue_vec_list.append(sample["tissue_vec"]) # [1024]
         target_list.append(sample["target"])
         smiles_list.append(sample["smiles"])
 

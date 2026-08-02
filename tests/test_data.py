@@ -19,7 +19,7 @@ def test_gtex_tissue_profiles():
     assert len(GTEX_TISSUE_PROFILES) == 10
     for organ in ORGAN_NAMES:
         vec = GTEX_TISSUE_PROFILES[organ]
-        assert vec.shape[0] == 256
+        assert vec.shape[0] == 1024
         assert torch.is_tensor(vec)
 
 def test_bemis_murcko_scaffold_split():
