@@ -1,0 +1,6 @@
+{
+  "name": "EpiADR-Net - Tissue-Conditioned Organ Toxicity AI",
+  "description": "Enterprise-grade Tissue-Conditioned AI platform for Zero-Shot Adverse Drug Reaction (ADR) & Organ Toxicity Prediction with GTEx Transcriptomics & SMILES molecular analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
