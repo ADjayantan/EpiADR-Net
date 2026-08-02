@@ -221,4 +221,4 @@ with gr.Blocks(title="EpiADR-Net v5 — Hugging Face Space", theme=gr.themes.Sof
 
 
 if __name__ == "__main__":
-    demo.queue().launch()
+    demo.launch(ssr=False)
