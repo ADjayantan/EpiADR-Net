@@ -53,6 +53,55 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
   return (
     <div className="space-y-6">
       
+      {/* Medical Doctor & Biological Research Scope Banner */}
+      <div className="bg-gradient-to-r from-rose-950/80 via-slate-900 to-slate-950 border border-rose-900/60 rounded-2xl p-4 shadow-lg flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-rose-900/40 rounded-xl text-rose-300 border border-rose-700/50">
+            <ShieldAlert className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-rose-200 uppercase tracking-wider">Clinical & Biological Research Scope</span>
+              <span className="bg-rose-900/60 text-rose-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-rose-700/60">
+                MD / Toxicologist Access Only
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Computational in-silico disaggregation intended for certified Medical Doctors, Clinical Pharmacologists, and Preclinical Researchers.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            const csvData = [
+              ['Compound Name', prediction.compoundName],
+              ['SMILES', activeSmiles],
+              ['Applicability Domain', prediction.applicabilityDomain],
+              ['Tanimoto Score', prediction.tanimotoSimilarity],
+              ['Hepatotoxicity (Liver)', `${(prediction.organScores.liver.meanRisk * 100).toFixed(1)}% (±${prediction.organScores.liver.uncertaintySigma})`],
+              ['Cardiotoxicity (Heart)', `${(prediction.organScores.heart.meanRisk * 100).toFixed(1)}% (±${prediction.organScores.heart.uncertaintySigma})`],
+              ['Nephrotoxicity (Kidney)', `${(prediction.organScores.kidney.meanRisk * 100).toFixed(1)}% (±${prediction.organScores.kidney.uncertaintySigma})`],
+              ['Neurotoxicity (Brain)', `${(prediction.organScores.brain.meanRisk * 100).toFixed(1)}% (±${prediction.organScores.brain.uncertaintySigma})`],
+              ['Pulmotoxicity (Lung)', `${(prediction.organScores.lung.meanRisk * 100).toFixed(1)}% (±${prediction.organScores.lung.uncertaintySigma})`]
+            ].map(e => e.join(',')).join('\n');
+
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `EpiADR_Report_${prediction.compoundName.replace(/[^a-zA-Z0-9]/g, '_')}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          className="px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-rose-300 border border-rose-800/80 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow"
+        >
+          <Database className="w-3.5 h-3.5 text-rose-400" />
+          <span>Export Clinical CSV Report</span>
+        </button>
+      </div>
+
       {/* Molecule Input & Preset Selector */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
