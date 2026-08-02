@@ -104,10 +104,10 @@ def train_scaffold_fold(
         collate_fn=custom_collate_fn,
     )
 
-    # 100M+ Parameter Model Instantiation with Tissue Conditioning Control
+    # 1 Billion+ Parameter Foundation Model Instantiation
     model = EpiADRNet(
-        in_features=24, hidden_dim=1536, tissue_dim=1024,
-        num_classes=10, num_gat_layers=12, num_heads=16, dropout=0.1,
+        in_features=24, hidden_dim=2048, tissue_dim=2048,
+        num_classes=10, num_gat_layers=16, num_heads=32, dropout=0.1,
         use_tissue_conditioning=use_tissue_conditioning
     )
 
@@ -181,23 +181,23 @@ def train_scaffold_fold(
 def run_5fold_ensemble_benchmark(
     use_tissue_conditioning: bool = True,
     is_ci: bool = False,
-    epochs: int = 5,
-    repeat: int = 8,
+    epochs: int = 10,
+    repeat: int = 16,
     lr: float = 3e-4,
     batch_size: int = 32
 ):
     # Instantiate single model to display exact parameter count
     temp_m = EpiADRNet(
-        in_features=24, hidden_dim=1536, tissue_dim=1024, num_classes=10, num_gat_layers=12, num_heads=16,
+        in_features=24, hidden_dim=2048, tissue_dim=2048, num_classes=10, num_gat_layers=16, num_heads=32,
         use_tissue_conditioning=use_tissue_conditioning
     )
     n_params = temp_m.count_parameters()
 
     mode_str = "Tissue-Conditioned" if use_tissue_conditioning else "Molecule-Only Baseline"
     print("=" * 70, flush=True)
-    print(f"   EpiADR-Net v5  —  100M+ Parameter ({mode_str})   ", flush=True)
-    print("   Architecture: DMPNN + 12-Layer Graph Transformer + SwiGLU FFN   ", flush=True)
-    print(f"   Parameters  : {n_params:,} (~116.5M per fold)                  ", flush=True)
+    print(f"   EpiADR-Net v5.1 — 1 BILLION+ PARAMETER FOUNDATION MODEL ({mode_str})   ", flush=True)
+    print("   Architecture: DMPNN + 16-Layer Graph Transformer + SwiGLU FFN   ", flush=True)
+    print(f"   Parameters  : {n_params:,} (~1.05B per fold / 5.24B Ensemble) ", flush=True)
     print("=" * 70, flush=True)
 
     repeat_val = 1 if is_ci else repeat
