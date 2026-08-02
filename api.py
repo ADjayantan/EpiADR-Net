@@ -1,13 +1,13 @@
+import os
+
+import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-import torch
-import os
 
-from utils import smiles_to_graph, highlight_toxic_subgraph
 from data_loader import GTEX_TISSUE_PROFILES, MEDDRA_ADR_CLASSES, ORGAN_NAMES
 from model import EpiADRNet
+from utils import highlight_toxic_subgraph, smiles_to_graph
 
 app = FastAPI(
     title="EpiADR-Net REST Microservice API",
@@ -44,11 +44,11 @@ if os.path.exists(MODEL_WEIGHTS_PATH):
 class PredictionRequest(BaseModel):
     smiles: str = Field(..., json_schema_extra={"example": "CC(=O)NC1=CC=C(O)C=C1"}, description="Valid molecular SMILES string")
     organ: str = Field(..., json_schema_extra={"example": "Liver"}, description="Target human tissue profile (Liver, Heart, Brain, Kidney, Lung, Pancreas, Spleen, Intestine, Skin, Bone_Marrow)")
-    mc_samples: Optional[int] = Field(20, ge=5, le=50, description="Monte Carlo Dropout sample passes")
+    mc_samples: int | None = Field(20, ge=5, le=50, description="Monte Carlo Dropout sample passes")
 
 class ExplainRequest(BaseModel):
     smiles: str = Field(..., json_schema_extra={"example": "O=C1C2=C(O)C=CC=C2C(=O)C3=C1C(O)=C4C(=C3O)C(O)(C(=O)CO)CC(O)C4"})
-    top_k: Optional[int] = Field(3, ge=1, le=10)
+    top_k: int | None = Field(3, ge=1, le=10)
 
 class CompareRequest(BaseModel):
     smiles: str = Field(..., json_schema_extra={"example": "CC(=O)NC1=CC=C(O)C=C1"})
@@ -90,7 +90,7 @@ def predict_adr(req: PredictionRequest):
         raise HTTPException(status_code=400, detail=f"Unsupported organ '{req.organ}'. Choose from {ORGAN_NAMES}")
 
     try:
-        node_feats, edge_index, atom_symbols = smiles_to_graph(req.smiles)
+        node_feats, edge_index, _atom_symbols = smiles_to_graph(req.smiles)
         batch = torch.zeros(node_feats.size(0), dtype=torch.long)
         tissue_vec = GTEX_TISSUE_PROFILES[req.organ].unsqueeze(0)
 
@@ -118,12 +118,12 @@ def predict_adr(req: PredictionRequest):
             "xai_explanation": xai_breakdown
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Inference failed: {e!s}")
 
 @app.post("/explain", tags=["Explainable AI"])
 def explain_subgraph(req: ExplainRequest):
     try:
-        node_feats, edge_index, atom_symbols = smiles_to_graph(req.smiles)
+        node_feats, edge_index, _atom_symbols = smiles_to_graph(req.smiles)
         batch = torch.zeros(node_feats.size(0), dtype=torch.long)
         tissue_vec = GTEX_TISSUE_PROFILES["Liver"].unsqueeze(0)
 
@@ -131,7 +131,7 @@ def explain_subgraph(req: ExplainRequest):
         explanation = highlight_toxic_subgraph(req.smiles, attn, top_k=req.top_k)
         return explanation
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"XAI extraction failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"XAI extraction failed: {e!s}")
 
 @app.post("/compare-organs", tags=["Comparative Analysis"])
 def compare_organs(req: CompareRequest):

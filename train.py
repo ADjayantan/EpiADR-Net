@@ -1,19 +1,18 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
-import numpy as np
-import os
-import sys
 import argparse
-from typing import Dict, Tuple, List, Optional
 import warnings
+
+import numpy as np
+import torch
+from sklearn.metrics import auc, precision_recall_curve, roc_auc_score
+from torch import nn
+from torch.utils.data import DataLoader
+
 warnings.filterwarnings("ignore")
 
-from data_loader import EpiADRDataset, custom_collate_fn, MEDDRA_ADR_CLASSES
-from utils import bemis_murcko_scaffold_split, random_split
+from data_loader import MEDDRA_ADR_CLASSES, EpiADRDataset, custom_collate_fn
 from model import EpiADRNet
+from utils import bemis_murcko_scaffold_split
+
 
 # ─────────────────────────────────────────────────────────────────
 #  PolyAsymmetricLoss for High-Precision Multi-Label Classification
@@ -25,7 +24,7 @@ class PolyAsymmetricLoss(nn.Module):
         gamma_neg: float = 4.0,
         epsilon: float = 1.0,
         clip: float = 0.05,
-        pos_weight: Optional[torch.Tensor] = None,
+        pos_weight: torch.Tensor | None = None,
     ):
         super().__init__()
         self.gamma_pos = gamma_pos
@@ -52,9 +51,9 @@ class PolyAsymmetricLoss(nn.Module):
         return loss.mean()
 
 
-def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[float, float, Dict[str, float]]:
-    auroc_per_class: Dict[str, float] = {}
-    auroc_list: List[float] = []
+def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, dict[str, float]]:
+    auroc_per_class: dict[str, float] = {}
+    auroc_list: list[float] = []
 
     for c, name in enumerate(MEDDRA_ADR_CLASSES):
         col = y_true[:, c]
@@ -82,13 +81,13 @@ def compute_pos_weights(dataset) -> torch.Tensor:
 def train_scaffold_fold(
     fold_idx: int,
     dataset: EpiADRDataset,
-    train_indices: List[int],
-    val_indices: List[int],
+    train_indices: list[int],
+    val_indices: list[int],
     epochs: int = 2,
     batch_size: int = 32,
     lr: float = 4e-4,
     use_tissue_conditioning: bool = True,
-) -> Tuple[EpiADRNet, float, float, np.ndarray, np.ndarray]:
+) -> tuple[EpiADRNet, float, float, np.ndarray, np.ndarray]:
     train_sub = torch.utils.data.Subset(dataset, train_indices)
     val_sub = torch.utils.data.Subset(dataset, val_indices)
 
@@ -136,7 +135,7 @@ def train_scaffold_fold(
 
         y_tv = np.vstack(y_true_v)
         y_pv = np.vstack(y_pred_v)
-        v_auroc, v_auprc, _ = calculate_metrics(y_tv, y_pv)
+        v_auroc, _v_auprc, _ = calculate_metrics(y_tv, y_pv)
 
         if v_auroc > best_val_auroc:
             best_val_auroc = v_auroc
@@ -185,9 +184,9 @@ def run_5fold_ensemble_benchmark(use_tissue_conditioning: bool = True):
     scaffold_train, scaffold_val, scaffold_test = bemis_murcko_scaffold_split(dataset, smiles_ls)
     all_scaffold_idx = scaffold_train + scaffold_val + scaffold_test
 
-    folds_models: List[EpiADRNet] = []
-    fold_aurocs: List[float] = []
-    fold_auprcs: List[float] = []
+    folds_models: list[EpiADRNet] = []
+    fold_aurocs: list[float] = []
+    fold_auprcs: list[float] = []
 
     y_val_trues = []
     y_val_preds = []

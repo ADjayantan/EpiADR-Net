@@ -1,8 +1,14 @@
-import pytest
 import torch
-from model import GraphTransformerBlock, DMPNNLayer, GenePathwayCrossAttention100M, EpiADRNet
-from utils import smiles_to_graph
+
 from data_loader import GTEX_TISSUE_PROFILES
+from model import (
+    DMPNNLayer,
+    EpiADRNet,
+    GenePathwayCrossAttention100M,
+    GraphTransformerBlock,
+)
+from utils import smiles_to_graph
+
 
 def test_graph_transformer_block_forward():
     x = torch.randn(10, 1536)

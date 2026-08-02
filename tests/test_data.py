@@ -1,8 +1,12 @@
-import pytest
 import torch
-import numpy as np
-from utils import smiles_to_graph, get_bemis_murcko_scaffold, bemis_murcko_scaffold_split
-from data_loader import GTEX_TISSUE_PROFILES, EpiADRDataset, ORGAN_NAMES
+
+from data_loader import GTEX_TISSUE_PROFILES, ORGAN_NAMES, EpiADRDataset
+from utils import (
+    bemis_murcko_scaffold_split,
+    get_bemis_murcko_scaffold,
+    smiles_to_graph,
+)
+
 
 def test_smiles_to_graph():
     smiles = "CC(=O)NC1=CC=C(O)C=C1"  # Acetaminophen
@@ -31,6 +35,6 @@ def test_bemis_murcko_scaffold_split():
     assert len(train_idx) + len(val_idx) + len(test_idx) == len(dataset)
     assert len(set(train_idx).intersection(set(test_idx))) == 0
 
-    train_scaffolds = set(get_bemis_murcko_scaffold(smiles_list[i]) for i in train_idx)
-    test_scaffolds = set(get_bemis_murcko_scaffold(smiles_list[i]) for i in test_idx)
+    train_scaffolds = {get_bemis_murcko_scaffold(smiles_list[i]) for i in train_idx}
+    test_scaffolds = {get_bemis_murcko_scaffold(smiles_list[i]) for i in test_idx}
     assert len(train_scaffolds.intersection(test_scaffolds)) == 0

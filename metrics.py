@@ -1,12 +1,13 @@
+
 import numpy as np
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
-from typing import Dict, Tuple, Optional, Any, List
+from sklearn.metrics import auc, precision_recall_curve, roc_auc_score
+
 
 def calculate_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
-    label_names: Optional[List[str]] = None
-) -> Tuple[float, float, Dict[str, Optional[float]]]:
+    label_names: list[str] | None = None
+) -> tuple[float, float, dict[str, float | None]]:
     """
     Computes Macro-AUROC and Micro-AUPRC across multi-label targets.
     Protects against constant-label columns by returning None for single-class columns.
@@ -14,8 +15,8 @@ def calculate_metrics(
     if label_names is None:
         label_names = [f"Class_{i}" for i in range(y_true.shape[1])]
 
-    per_class_auroc: Dict[str, Optional[float]] = {}
-    valid_aurocs: List[float] = []
+    per_class_auroc: dict[str, float | None] = {}
+    valid_aurocs: list[float] = []
 
     for idx, name in enumerate(label_names):
         col_true = y_true[:, idx]
@@ -50,7 +51,7 @@ def bootstrap_confidence_intervals(
     n_bootstraps: int = 1000,
     ci: float = 95.0,
     seed: int = 42
-) -> Dict[str, Dict[str, float]]:
+) -> dict[str, dict[str, float]]:
     """
     Computes non-parametric percentile bootstrap confidence intervals (2.5% - 97.5%)
     for Macro-AUROC and Micro-AUPRC over n_bootstraps resamples with replacement.
@@ -58,8 +59,8 @@ def bootstrap_confidence_intervals(
     rng = np.random.RandomState(seed)
     n_samples = len(y_true)
 
-    bootstrapped_aurocs: List[float] = []
-    bootstrapped_auprcs: List[float] = []
+    bootstrapped_aurocs: list[float] = []
+    bootstrapped_auprcs: list[float] = []
 
     for _ in range(n_bootstraps):
         indices = rng.choice(n_samples, size=n_samples, replace=True)

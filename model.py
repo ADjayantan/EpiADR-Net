@@ -1,7 +1,9 @@
+from typing import Any
+
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from typing import Tuple, Dict, Any, Optional, List
+from torch import nn
+
 
 # ─────────────────────────────────────────────────────────────────
 #  SwiGLU Feed-Forward Expansion Block
@@ -140,7 +142,7 @@ class GraphTransformerBlock(nn.Module):
         self,
         x: torch.Tensor,
         edge_index: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         N = x.size(0)
         residual = self.skip(x)
 
@@ -308,7 +310,7 @@ class EpiADRNet(nn.Module):
         batch: torch.Tensor,
         tissue_vec: torch.Tensor,
         return_attention: bool = False,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         num_graphs = tissue_vec.size(0)
         h = self.input_proj(x)
 
@@ -347,9 +349,9 @@ class EpiADRNet(nn.Module):
         batch: torch.Tensor,
         tissue_vec: torch.Tensor,
         num_samples: int = 30,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         self.train()
-        preds: List[torch.Tensor] = []
+        preds: list[torch.Tensor] = []
         last_attn = None
 
         with torch.no_grad():
@@ -367,7 +369,7 @@ class EpiADRNet(nn.Module):
             "attention_weights": last_attn,
         }
 
-    def model_config(self) -> Dict[str, Any]:
+    def model_config(self) -> dict[str, Any]:
         return {
             "in_features": 24,
             "hidden_dim": self.hidden_dim,

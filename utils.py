@@ -1,8 +1,9 @@
-import re
 import random
-from typing import List, Tuple, Dict, Any, Optional
-import torch
+import re
+from typing import Any
+
 import numpy as np
+import torch
 
 # Suppress RDKit C++ stderr noise
 try:
@@ -38,7 +39,7 @@ VDW_RADIUS = {
 HALOGENS = {'F', 'Cl', 'Br', 'I'}
 HETEROATOMS = {'P', 'S', 'Se', 'B', 'Si', 'Pt'}
 
-def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]:
+def smiles_to_graph(smiles: str) -> tuple[torch.Tensor, torch.Tensor, list[str]]:
     """
     Converts a SMILES string into a rich molecular graph with 24-dimensional atom features x_i in R^24
     and edge_index E in R^(2 x M).
@@ -68,7 +69,7 @@ def smiles_to_graph(smiles: str) -> Tuple[torch.Tensor, torch.Tensor, List[str]]
     """
     def _atom_to_features(symbol, num, deg, chg, hyb, aromatic,
                            imp_val, in_ring, mass, chiral, h_count,
-                           ring_sizes, conjugated, charge_proxy) -> List[float]:
+                           ring_sizes, conjugated, charge_proxy) -> list[float]:
         group = [0.0, 0.0, 0.0, 0.0]
         if symbol in {'C', 'N', 'O'}:
             group[0] = 1.0
@@ -230,13 +231,13 @@ def get_bemis_murcko_scaffold(smiles: str) -> str:
 
 def bemis_murcko_scaffold_split(
     dataset,
-    smiles_list: List[str],
+    smiles_list: list[str],
     frac_train: float = 0.8,
     frac_val: float = 0.1,
     frac_test: float = 0.1,
     seed: int = 42,
-) -> Tuple[List[int], List[int], List[int]]:
-    scaffolds: Dict[str, List[int]] = {}
+) -> tuple[list[int], list[int], list[int]]:
+    scaffolds: dict[str, list[int]] = {}
     for idx, smi in enumerate(smiles_list):
         sc = get_bemis_murcko_scaffold(smi)
         scaffolds.setdefault(sc, []).append(idx)
@@ -267,7 +268,7 @@ def random_split(
     frac_val: float = 0.1,
     frac_test: float = 0.1,
     seed: int = 42,
-) -> Tuple[List[int], List[int], List[int]]:
+) -> tuple[list[int], list[int], list[int]]:
     indices = list(range(len(dataset)))
     random.Random(seed).shuffle(indices)
     n = len(indices)
@@ -283,8 +284,8 @@ def highlight_toxic_subgraph(
     smiles: str,
     attention_scores: torch.Tensor,
     top_k: int = 3,
-) -> Dict[str, Any]:
-    node_feats, edge_index, atom_symbols = smiles_to_graph(smiles)
+) -> dict[str, Any]:
+    _node_feats, _edge_index, atom_symbols = smiles_to_graph(smiles)
     num_nodes = len(atom_symbols)
 
     if attention_scores is None or len(attention_scores) == 0:
@@ -321,8 +322,8 @@ def highlight_toxic_subgraph(
 
 def calculate_tanimoto_applicability_domain(
     query_smiles: str,
-    training_smiles_list: List[str]
-) -> Dict[str, Any]:
+    training_smiles_list: list[str]
+) -> dict[str, Any]:
     """
     Computes maximum Tanimoto similarity between query molecule and training dataset.
     Flags applicability domain confidence:
@@ -345,8 +346,7 @@ def calculate_tanimoto_applicability_domain(
             if tr_mol is not None:
                 tr_fp = RDKFingerprint(tr_mol)
                 sim = DataStructs.TanimotoSimilarity(q_fp, tr_fp)
-                if sim > max_sim:
-                    max_sim = sim
+                max_sim = max(max_sim, sim)
 
         max_sim = round(float(max_sim), 4)
         if max_sim >= 0.70:

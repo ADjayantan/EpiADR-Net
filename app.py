@@ -1,15 +1,20 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as gg
-import requests
 import json
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import requests
+import streamlit as st
 import torch
 
-from data_loader import GTEX_TISSUE_PROFILES, MEDDRA_ADR_CLASSES, ORGAN_NAMES, BENCHMARK_DRUGS
-from utils import smiles_to_graph, highlight_toxic_subgraph
+from data_loader import (
+    BENCHMARK_DRUGS,
+    GTEX_TISSUE_PROFILES,
+    MEDDRA_ADR_CLASSES,
+    ORGAN_NAMES,
+)
 from model import EpiADRNet
+from utils import highlight_toxic_subgraph, smiles_to_graph
 
 # Streamlit Page Config
 st.set_page_config(
@@ -139,7 +144,7 @@ with tab1:
                 range_x=[0, 1.0]
             )
             fig.add_vline(x=confidence_thresh, line_dash="dash", line_color="black", annotation_text="Threshold")
-            fig.update_layout(height=450, margin=dict(l=0, r=0, t=30, b=0))
+            fig.update_layout(height=450, margin={"l": 0, "r": 0, "t": 30, "b": 0})
             st.plotly_chart(fig, use_container_width=True)
 
         with col_right:
@@ -255,5 +260,5 @@ with tab4:
             res = requests.post(api_endpoint, json=json.loads(json_payload), timeout=5)
             st.json(res.json())
         except Exception as e:
-            st.error(f"Could not connect to FastAPI server at {api_endpoint}: {str(e)}")
+            st.error(f"Could not connect to FastAPI server at {api_endpoint}: {e!s}")
             st.warning("Note: Make sure `uvicorn api:app --reload` is running on port 8000.")

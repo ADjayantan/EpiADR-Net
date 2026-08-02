@@ -1,13 +1,19 @@
+from typing import Any
+
 import gradio as gr
-import torch
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from typing import Tuple, Dict, Any
+import torch
 
-from utils import smiles_to_graph, highlight_toxic_subgraph
-from data_loader import GTEX_TISSUE_PROFILES, MEDDRA_ADR_CLASSES, ORGAN_NAMES, BENCHMARK_DRUGS
+from data_loader import (
+    BENCHMARK_DRUGS,
+    GTEX_TISSUE_PROFILES,
+    MEDDRA_ADR_CLASSES,
+    ORGAN_NAMES,
+)
 from model import EpiADRNet
+from utils import highlight_toxic_subgraph, smiles_to_graph
 
 # Hugging Face Zero-GPU runtime compatibility decorator
 try:
@@ -30,14 +36,14 @@ MODEL.eval()
 
 
 @gpu_decorator
-def predict_single_organ(smiles: str, organ: str, mc_passes: int) -> Tuple[pd.DataFrame, str, Any]:
+def predict_single_organ(smiles: str, organ: str, mc_passes: int) -> tuple[pd.DataFrame, str, Any]:
     """
     Predicts organ-conditioned ADR probabilities, epistemic uncertainty, and XAI toxic hotspots.
     """
     if not smiles or organ not in GTEX_TISSUE_PROFILES:
         return pd.DataFrame(), "Invalid SMILES or Organ", None
 
-    node_feats, edge_index, atom_symbols = smiles_to_graph(smiles)
+    node_feats, edge_index, _atom_symbols = smiles_to_graph(smiles)
     batch = torch.zeros(node_feats.size(0), dtype=torch.long)
     tissue_vec = GTEX_TISSUE_PROFILES[organ].unsqueeze(0)
 
@@ -55,7 +61,7 @@ def predict_single_organ(smiles: str, organ: str, mc_passes: int) -> Tuple[pd.Da
 
     xai_res = highlight_toxic_subgraph(smiles, attn, top_k=3)
     
-    xai_text = f"### 🔬 Toxic Hotspot Analysis (Layer 4 GAT Attention)\n"
+    xai_text = "### 🔬 Toxic Hotspot Analysis (Layer 4 GAT Attention)\n"
     xai_text += f"- **Parsed Atoms**: `{xai_res['total_atoms']}` ({' '.join(xai_res['atom_symbols'])})\n\n"
     xai_text += "**Top Reactive Subgraph Atoms:**\n"
     for hs in xai_res["top_toxic_hotspots"]:

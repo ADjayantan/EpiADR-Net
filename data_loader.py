@@ -1,17 +1,19 @@
-import torch
-from torch.utils.data import Dataset
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Any
+import torch
 from rdkit import Chem
+from torch.utils.data import Dataset
+
 from utils import smiles_to_graph
+
 
 # ─────────────────────────────────────────────────────────────────
 #  Data Contract Exceptions & Loaders
 # ─────────────────────────────────────────────────────────────────
 class DataContractError(Exception):
     """Raised when dataset CSV files fail schema or integrity contracts."""
-    pass
 
 
 class GTExTissueLoader:
@@ -19,7 +21,7 @@ class GTExTissueLoader:
     Contract-conforming GTEx tissue profile loader.
     Validates data/tissue_profiles.csv against contract specifications.
     """
-    def __init__(self, profiles: Dict[str, torch.Tensor]):
+    def __init__(self, profiles: dict[str, torch.Tensor]):
         self.profiles = profiles
 
     @classmethod
@@ -129,7 +131,7 @@ _TISSUE_ALPHA = {
 
 TISSUE_DIM = 1024
 
-GTEX_TISSUE_PROFILES: Dict[str, torch.Tensor] = {
+GTEX_TISSUE_PROFILES: dict[str, torch.Tensor] = {
     organ: torch.tensor(
         np.random.dirichlet(np.ones(TISSUE_DIM) * alpha).astype(np.float32)
     )
@@ -157,7 +159,7 @@ _RAW_DRUG_DEFS = [
     ("Naproxen", "COc1ccc2cc(C(C)C(=O)O)ccc2c1", ["Gastrointestinal Toxicity", "Kidney"]),
 ]
 
-BENCHMARK_DRUGS: List[Dict[str, Any]] = []
+BENCHMARK_DRUGS: list[dict[str, Any]] = []
 for idx, (name, smiles, tox) in enumerate(_RAW_DRUG_DEFS):
     BENCHMARK_DRUGS.append({"name": name, "smiles": smiles, "toxic_organs": tox})
 
@@ -187,7 +189,7 @@ _SYSTEMIC_TO_ADR_IDX = {
     "Metabolic Disruption":     9,
 }
 
-def _build_target_vector(organ_name: str, toxic_organs: List[str]) -> torch.Tensor:
+def _build_target_vector(organ_name: str, toxic_organs: list[str]) -> torch.Tensor:
     target = torch.zeros(10, dtype=torch.float32)
     organ_adr_idx = _ORGAN_TO_ADR_IDX.get(organ_name)
     if organ_adr_idx is not None and organ_name in toxic_organs:
@@ -202,16 +204,16 @@ def _build_target_vector(organ_name: str, toxic_organs: List[str]) -> torch.Tens
 class EpiADRDataset(Dataset):
     def __init__(
         self,
-        drugs: List[Dict[str, Any]] = None,
+        drugs: list[dict[str, Any]] | None = None,
         repeat: int = 4,
     ):
         self.drugs = drugs if drugs is not None else BENCHMARK_DRUGS
         self.repeat = repeat
-        self.samples: List[Dict[str, Any]] = []
+        self.samples: list[dict[str, Any]] = []
         self._build()
 
     def _build(self):
-        graph_cache: Dict[str, Any] = {}
+        graph_cache: dict[str, Any] = {}
         for item in self.drugs:
             smiles = item["smiles"]
             if smiles not in graph_cache:
@@ -252,7 +254,7 @@ class EpiADRDataset(Dataset):
     def __getitem__(self, idx):
         return self.samples[idx]
 
-def custom_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
+def custom_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
     node_feats_list = []
     edge_index_list = []
     batch_index_list = []

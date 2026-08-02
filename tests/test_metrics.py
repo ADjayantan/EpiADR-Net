@@ -1,13 +1,14 @@
-import pytest
 import numpy as np
-from metrics import calculate_metrics, bootstrap_confidence_intervals
+
+from metrics import bootstrap_confidence_intervals, calculate_metrics
+
 
 def test_calculate_metrics_constant_label_protection():
     # Column 0 is constant 0, Column 1 is balanced
     y_true = np.array([[0, 0], [0, 1], [0, 0], [0, 1]], dtype=int)
     y_pred = np.array([[0.1, 0.2], [0.2, 0.8], [0.3, 0.1], [0.4, 0.9]], dtype=float)
 
-    macro_auc, micro_pr, per_class = calculate_metrics(y_true, y_pred, label_names=["ConstClass", "BalancedClass"])
+    macro_auc, _micro_pr, per_class = calculate_metrics(y_true, y_pred, label_names=["ConstClass", "BalancedClass"])
 
     assert per_class["ConstClass"] is None
     assert per_class["BalancedClass"] is not None
