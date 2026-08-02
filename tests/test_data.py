@@ -11,7 +11,7 @@ def test_smiles_to_graph():
     assert isinstance(node_feats, torch.Tensor)
     assert isinstance(edge_index, torch.Tensor)
     assert node_feats.ndim == 2
-    assert node_feats.shape[1] == 17  # 17 features per atom node
+    assert node_feats.shape[1] == 24  # 24 features per atom node
     assert edge_index.shape[0] == 2  # Source -> Target edges
     assert len(atom_symbols) == node_feats.shape[0]
 

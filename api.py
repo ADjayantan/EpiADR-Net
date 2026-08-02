@@ -11,8 +11,8 @@ from model import EpiADRNet
 
 app = FastAPI(
     title="EpiADR-Net REST Microservice API",
-    description="Enterprise API for Tissue-Conditioned Zero-Shot Adverse Drug Reaction (ADR) Disaggregation — v3",
-    version="3.0.0",
+    description="Enterprise API for Tissue-Conditioned Zero-Shot Adverse Drug Reaction (ADR) Disaggregation — v4 Ultra-Performance",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -26,10 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Model Initialization — EpiADR-Net v3
+# Global Model Initialization — EpiADR-Net v4
 MODEL = EpiADRNet(
-    in_features=17, hidden_dim=512, tissue_dim=256,
-    num_classes=10, num_gat_layers=6, num_heads=8, dropout=0.3,
+    in_features=24, hidden_dim=512, tissue_dim=256,
+    num_classes=10, num_gat_layers=4, num_heads=8, dropout=0.2,
 )
 MODEL_WEIGHTS_PATH = "model.pt"
 if os.path.exists(MODEL_WEIGHTS_PATH):
@@ -61,8 +61,8 @@ def root():
     return {
         "status": "online",
         "service": "EpiADR-Net REST Microservice",
-        "version": "3.0.0",
-        "architecture": "6-Layer GAT | 8-Head | 512-dim | 17 atom features",
+        "version": "4.0.0",
+        "architecture": "DMPNN + 4-Layer GAT + Gene Pathway Cross-Attention | 24 Features | 12.2M params",
         "documentation": "/docs"
     }
 
