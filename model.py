@@ -367,5 +367,15 @@ class EpiADRNet(nn.Module):
             "attention_weights": last_attn,
         }
 
+    def model_config(self) -> Dict[str, Any]:
+        return {
+            "in_features": 24,
+            "hidden_dim": self.hidden_dim,
+            "num_classes": self.num_classes,
+            "num_gat_layers": len(self.gat_layers),
+            "use_tissue_conditioning": self.use_tissue_conditioning,
+            "parameters": self.count_parameters(),
+        }
+
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

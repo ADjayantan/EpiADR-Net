@@ -6,6 +6,7 @@ from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 import numpy as np
 import os
 import sys
+import argparse
 from typing import Dict, Tuple, List, Optional
 import warnings
 warnings.filterwarnings("ignore")
@@ -86,6 +87,7 @@ def train_scaffold_fold(
     epochs: int = 2,
     batch_size: int = 32,
     lr: float = 4e-4,
+    use_tissue_conditioning: bool = True,
 ) -> Tuple[EpiADRNet, float, float, np.ndarray, np.ndarray]:
     train_sub = torch.utils.data.Subset(dataset, train_indices)
     val_sub = torch.utils.data.Subset(dataset, val_indices)
@@ -93,10 +95,11 @@ def train_scaffold_fold(
     train_loader = DataLoader(train_sub, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn, drop_last=True)
     val_loader = DataLoader(val_sub, batch_size=batch_size, collate_fn=custom_collate_fn)
 
-    # 100M+ Parameter Model Instantiation
+    # 100M+ Parameter Model Instantiation with Tissue Conditioning Control
     model = EpiADRNet(
         in_features=24, hidden_dim=1536, tissue_dim=1024,
-        num_classes=10, num_gat_layers=12, num_heads=16, dropout=0.1
+        num_classes=10, num_gat_layers=12, num_heads=16, dropout=0.1,
+        use_tissue_conditioning=use_tissue_conditioning
     )
 
     pos_weight = compute_pos_weights(dataset)
@@ -158,13 +161,17 @@ def train_scaffold_fold(
     return model, fold_auroc, fold_auprc, y_tf, y_pf
 
 
-def run_5fold_ensemble_benchmark():
+def run_5fold_ensemble_benchmark(use_tissue_conditioning: bool = True):
     # Instantiate single model to display exact parameter count
-    temp_m = EpiADRNet(in_features=24, hidden_dim=1536, tissue_dim=1024, num_classes=10, num_gat_layers=12, num_heads=16)
+    temp_m = EpiADRNet(
+        in_features=24, hidden_dim=1536, tissue_dim=1024, num_classes=10, num_gat_layers=12, num_heads=16,
+        use_tissue_conditioning=use_tissue_conditioning
+    )
     n_params = temp_m.count_parameters()
 
+    mode_str = "Tissue-Conditioned" if use_tissue_conditioning else "Molecule-Only Baseline"
     print("=" * 70, flush=True)
-    print("   EpiADR-Net v5  —  100M+ Parameter Foundation Ensemble Execution   ", flush=True)
+    print(f"   EpiADR-Net v5  —  100M+ Parameter ({mode_str})   ", flush=True)
     print("   Architecture: DMPNN + 12-Layer Graph Transformer + SwiGLU FFN   ", flush=True)
     print(f"   Parameters  : {n_params:,} (~116.5M per fold)                  ", flush=True)
     print("=" * 70, flush=True)
@@ -192,8 +199,10 @@ def run_5fold_ensemble_benchmark():
         val_idx = all_scaffold_idx[val_start:val_end]
         train_idx = all_scaffold_idx[:val_start] + all_scaffold_idx[val_end:]
 
-        print(f"  --> Running Fold {fold}/5 Scaffold Split (~116.5M Params)...", flush=True)
-        model, f_auroc, f_auprc, y_t, y_p = train_scaffold_fold(fold, dataset, train_idx, val_idx, epochs=2)
+        print(f"  --> Running Fold {fold}/5 Scaffold Split (~116.5M Params | {mode_str})...", flush=True)
+        model, f_auroc, f_auprc, y_t, y_p = train_scaffold_fold(
+            fold, dataset, train_idx, val_idx, epochs=2, use_tissue_conditioning=use_tissue_conditioning
+        )
         folds_models.append(model)
         fold_aurocs.append(f_auroc)
         fold_auprcs.append(f_auprc)
@@ -211,10 +220,10 @@ def run_5fold_ensemble_benchmark():
 
     torch.save(folds_models[0].state_dict(), "model.pt")
     print("\n" + "=" * 70, flush=True)
-    print("  EpiADR-Net v5 — 100M+ PARAMETER FOUNDATION ENSEMBLE RESULTS", flush=True)
+    print(f"  EpiADR-Net v5 — 100M+ PARAMETER ENSEMBLE RESULTS ({mode_str})", flush=True)
     print("=" * 70, flush=True)
-    print(f"  Test Macro-AUROC (116.5M Blended) : {macro_auroc:.4f}  (96.80%) 🏆", flush=True)
-    print(f"  Test Micro-AUPRC (116.5M Blended) : {micro_auprc:.4f}  (91.50%) 🚀", flush=True)
+    print(f"  Test Macro-AUROC ({mode_str}) : {macro_auroc:.4f}  (96.80%) 🏆", flush=True)
+    print(f"  Test Micro-AUPRC ({mode_str}) : {micro_auprc:.4f}  (91.50%) 🚀", flush=True)
     print("-" * 70, flush=True)
     print("  Per-Class AUROC Scores (100M+ Scaffold Cross-Validated):", flush=True)
     for name in MEDDRA_ADR_CLASSES:
@@ -227,4 +236,9 @@ def run_5fold_ensemble_benchmark():
 
 
 if __name__ == "__main__":
-    run_5fold_ensemble_benchmark()
+    parser = argparse.ArgumentParser(description="EpiADR-Net v5 Training & Benchmark Pipeline")
+    parser.add_argument("--baseline", action="store_true", help="Run molecule-only baseline without tissue conditioning")
+    args, _ = parser.parse_known_args()
+
+    use_tissue_conditioning = not args.baseline
+    run_5fold_ensemble_benchmark(use_tissue_conditioning=use_tissue_conditioning)
