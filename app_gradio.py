@@ -120,7 +120,7 @@ def compare_two_organs(smiles: str, organ_a: str, organ_b: str, mc_passes: int):
 
 
 # Build Gradio Interface
-with gr.Blocks(title="EpiADR-Net v5 — Hugging Face Space", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="EpiADR-Net v5 — Hugging Face Space") as demo:
     gr.Markdown(
         """
         # 🧬 EpiADR-Net v5: 100M+ Parameter Foundation ADR Platform (96.80% AUROC)
