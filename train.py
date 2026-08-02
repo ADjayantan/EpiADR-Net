@@ -106,8 +106,9 @@ def train_scaffold_fold(
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
 
     steps_per_epoch = max(len(train_loader), 1)
+    total_steps = max(epochs * steps_per_epoch, 50)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=lr, epochs=epochs, steps_per_epoch=steps_per_epoch, pct_start=0.10
+        optimizer, max_lr=lr, total_steps=total_steps, pct_start=0.10
     )
 
     best_val_auroc = 0.0
