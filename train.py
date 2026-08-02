@@ -178,7 +178,14 @@ def train_scaffold_fold(
     return model, fold_auroc, fold_auprc, y_tf, y_pf
 
 
-def run_5fold_ensemble_benchmark(use_tissue_conditioning: bool = True, is_ci: bool = False):
+def run_5fold_ensemble_benchmark(
+    use_tissue_conditioning: bool = True,
+    is_ci: bool = False,
+    epochs: int = 5,
+    repeat: int = 8,
+    lr: float = 3e-4,
+    batch_size: int = 32
+):
     # Instantiate single model to display exact parameter count
     temp_m = EpiADRNet(
         in_features=24, hidden_dim=1536, tissue_dim=1024, num_classes=10, num_gat_layers=12, num_heads=16,
@@ -193,7 +200,7 @@ def run_5fold_ensemble_benchmark(use_tissue_conditioning: bool = True, is_ci: bo
     print(f"   Parameters  : {n_params:,} (~116.5M per fold)                  ", flush=True)
     print("=" * 70, flush=True)
 
-    repeat_val = 1 if is_ci else 4
+    repeat_val = 1 if is_ci else repeat
     dataset = EpiADRDataset(repeat=repeat_val)
     smiles_ls = [s["smiles"] for s in dataset.samples]
 
@@ -211,7 +218,7 @@ def run_5fold_ensemble_benchmark(use_tissue_conditioning: bool = True, is_ci: bo
     y_val_preds = []
 
     max_folds = 1 if is_ci else 5
-    epochs = 1 if is_ci else 2
+    run_epochs = 1 if is_ci else epochs
 
     for fold in range(1, max_folds + 1):
         val_start = (fold - 1) * fold_size
@@ -220,9 +227,9 @@ def run_5fold_ensemble_benchmark(use_tissue_conditioning: bool = True, is_ci: bo
         val_idx = all_scaffold_idx[val_start:val_end]
         train_idx = all_scaffold_idx[:val_start] + all_scaffold_idx[val_end:]
 
-        print(f"  --> Running Fold {fold}/{max_folds} Scaffold Split (~116.5M Params | {mode_str})...", flush=True)
+        print(f"  --> Running Fold {fold}/{max_folds} Scaffold Split (~116.5M Params | {mode_str} | Epochs: {run_epochs})...", flush=True)
         model, f_auroc, f_auprc, y_t, y_p = train_scaffold_fold(
-            fold, dataset, train_idx, val_idx, epochs=epochs, use_tissue_conditioning=use_tissue_conditioning
+            fold, dataset, train_idx, val_idx, epochs=run_epochs, batch_size=batch_size, lr=lr, use_tissue_conditioning=use_tissue_conditioning
         )
         folds_models.append(model)
         fold_aurocs.append(f_auroc)
@@ -257,12 +264,23 @@ def run_5fold_ensemble_benchmark(use_tissue_conditioning: bool = True, is_ci: bo
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="EpiADR-Net v5 Training & Benchmark Pipeline")
+    parser = argparse.ArgumentParser(description="EpiADR-Net v5 Deep Training & Benchmark Pipeline")
     parser.add_argument("--baseline", action="store_true", help="Run molecule-only baseline without tissue conditioning")
     parser.add_argument("--quick", action="store_true", help="Run quick CI smoke test")
+    parser.add_argument("--epochs", type=int, default=5, help="Number of epochs per fold (default: 5)")
+    parser.add_argument("--repeat", type=int, default=8, help="Dataset augmentation repeat factor (default: 8)")
+    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate (default: 3e-4)")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size (default: 32)")
     args, _ = parser.parse_known_args()
 
     import os
     is_ci_env = os.getenv("CI") is not None or os.getenv("GITHUB_ACTIONS") is not None or args.quick
     use_tissue_conditioning = not args.baseline
-    run_5fold_ensemble_benchmark(use_tissue_conditioning=use_tissue_conditioning, is_ci=is_ci_env)
+    run_5fold_ensemble_benchmark(
+        use_tissue_conditioning=use_tissue_conditioning,
+        is_ci=is_ci_env,
+        epochs=args.epochs,
+        repeat=args.repeat,
+        lr=args.lr,
+        batch_size=args.batch_size
+    )
