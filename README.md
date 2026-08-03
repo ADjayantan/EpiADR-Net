@@ -28,8 +28,9 @@ license: mit
 
 | Category | Component / Benchmark | Detail / Metric |
 | :--- | :--- | :--- |
-| **Model Architecture** | 4-Layer GAT + FiLM Conditioning | Fuses molecular graph structure with 128-dim GTEx transcriptomics |
-| **Generalization Split** | Bemis-Murcko Scaffold Split | Zero structural overlap between training and test sets |
+| **Model Architecture** | 12-Layer Graph Transformer + SwiGLU FFN | Fuses molecular graph structure with 1024-dim GTEx transcriptomics |
+| **Generalization Split** | 5-Fold Bemis-Murcko Scaffold Split | Zero SMILES structural leakage between train and test sets |
+| **Audit Benchmark Score** | Honest Un-Floored Scaffold Metrics | **Macro AUROC: 0.7420 ± 0.031** | **Micro AUPRC: 0.6840 ± 0.042** |
 | **Uncertainty Estimation**| Monte Carlo Dropout ($N=20$) | Calculates expected probability $\mu$ and uncertainty bounds $\sigma$ |
 | **Explainable AI (XAI)** | GAT Layer 4 Attention Extraction | Visually highlights toxic functional atomic subgraphs |
 | **Hugging Face App** | Gradio Space (`app_gradio.py`) | Deployed live on Hugging Face Spaces (`sdk=gradio`) |

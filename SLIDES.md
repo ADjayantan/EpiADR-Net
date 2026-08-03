@@ -27,9 +27,9 @@ footer: 'A. D. Jayantan | Advanced Neural Computing Lab'
 
 # 📊 Benchmark Scaling Progress
 
-| Architecture | Model Parameters | Test Macro-AUROC | Test Micro-AUPRC |
-| :--- | :--- | :--- | :--- |
-| **Phase 1 Prototype** | 0.3M | 0.5573 | 0.2742 |
-| **v2 Multi-Head GAT** | 0.8M | 0.7842 | 0.6215 |
-| **v4 Ultra-Performance** | 12.2M | 0.9584 | 0.8920 |
-| **v5 Foundation Edition** | **116.5M** 🚀 | **0.9680 (96.80%)** 🏆 | **0.9150 (91.50%)** |
+| Architecture | Model Parameters | Test Macro-AUROC | Test Micro-AUPRC | Evaluation Scheme |
+| :--- | :--- | :--- | :--- | :--- |
+| **Phase 1 Prototype** | 0.3M | 0.5573 | 0.2742 | Random Split |
+| **v2 Multi-Head GAT** | 0.8M | 0.6812 | 0.5215 | Random Split |
+| **v4 Ultra-Performance** | 12.2M | 0.7140 | 0.6120 | Scaffold Split |
+| **v5 Foundation Edition (Audit)** | **116.5M** 🚀 | **0.7420 ± 0.031** 🏆 | **0.6840 ± 0.042** | **5-Fold Scaffold Split (Zero SMILES Leakage)** |

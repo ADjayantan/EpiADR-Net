@@ -90,3 +90,30 @@ def bootstrap_confidence_intervals(
             "upper": round(auprc_upper, 4),
         }
     }
+
+
+def calculate_expected_calibration_error(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    n_bins: int = 10
+) -> float:
+    """
+    Calculates Expected Calibration Error (ECE) for multi-label predictions across n_bins.
+    """
+    bin_boundaries = np.linspace(0, 1, n_bins + 1)
+    ece = 0.0
+
+    for i in range(n_bins):
+        bin_lower = bin_boundaries[i]
+        bin_upper = bin_boundaries[i + 1]
+
+        in_bin = (y_pred >= bin_lower) & (y_pred < bin_upper)
+        prop_in_bin = float(np.mean(in_bin))
+
+        if prop_in_bin > 0:
+            accuracy_in_bin = float(np.mean(y_true[in_bin]))
+            avg_confidence_in_bin = float(np.mean(y_pred[in_bin]))
+            ece += abs(accuracy_in_bin - avg_confidence_in_bin) * prop_in_bin
+
+    return round(float(ece), 4)
+

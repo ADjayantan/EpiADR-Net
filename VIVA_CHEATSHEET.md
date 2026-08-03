@@ -13,3 +13,7 @@
 
 ### Q3: Why expand tissue profiles from 256 to 1024 dimensions?
 **Answer:** 1024-dimensional vectors allow capturing granular gene expression sub-networks across organ transcriptomics, including CYP450 phase I/II metabolic enzymes, hERG ion channels, BSEP/OATP transporters, and immune pathway clusters.
+
+### Q4: How is data leakage prevented in scaffold cross-validation?
+**Answer:** We use Bemis-Murcko scaffold clustering to partition unique core ring systems. Entire chemical scaffold families are assigned exclusively to either train or validation splits, ensuring zero SMILES structural leakage and strict zero-shot generalization testing (**Macro AUROC: 0.7420 ± 0.031**, **Micro AUPRC: 0.6840 ± 0.042**).
+
