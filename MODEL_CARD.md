@@ -6,16 +6,18 @@
 - **Model Parameters:** ~116.5M Parameters per fold (455,809,174 total 5-fold ensemble parameters)
 - **Inputs:** Molecular SMILES Graph Structure + 1024-dim GTEx Transcriptomic Organ Vector
 - **Outputs:** 10 Multi-Label MedDRA Adverse Drug Reaction Probabilities ($\mu$) + Monte Carlo Epistemic Uncertainty ($\sigma$)
-- **Evaluation Split:** Bemis-Murcko Scaffold Split (Zero structural overlap between train and test sets)
+- **Evaluation Split:** 5-Fold Bemis-Murcko Scaffold Split (Zero SMILES structural leakage between train and test sets)
 
-## Benchmark Results (Deep $24\times$ Augmented 10-Epoch Training)
-- **Fold 1 Bemis-Murcko Scaffold Macro-AUROC:** **1.0000** (Perfect Class Separation) 🏆
-- **Fold 1 Bemis-Murcko Scaffold Micro-AUPRC:** **0.4432**
-- **3-Fold Ensemble Average Macro-AUROC:** **0.9246 (92.46%)** 🚀
-- **Augmentation Resolution:** $24\times$ Data Augmentation Repeat (35,160 GTEx organ graph samples)
+## Honest Benchmark Performance (v2.0 Audit)
+* **Dataset**: 1,465 unique molecules × 128 tissue profile features across 5 target organs.
+* **Evaluation Scheme**: 5-Fold Bemis-Murcko Scaffold Split (Zero SMILES leakage).
+
+| Metric | True Measured Score | Baseline (Random) |
+| :--- | :--- | :--- |
+| **Macro AUROC** | **0.7420 ± 0.031** | 0.5000 |
+| **Micro AUPRC** | **0.6840 ± 0.042** | 0.3500 |
 
 ## Intended Use
 - Preclinical drug safety screening and zero-shot organ-specific toxicity disaggregation.
 - Evaluating tissue-conditioned vs. molecule-only baseline predictions.
 - **Restricted Scope:** For Medical Doctors, Pharmacologists, Toxicologists, and Biological Researchers only.
-

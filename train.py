@@ -54,17 +54,20 @@ class PolyAsymmetricLoss(nn.Module):
 def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, dict[str, float]]:
     auroc_per_class: dict[str, float] = {}
     auroc_list: list[float] = []
+    auprc_list: list[float] = []
 
     for c, name in enumerate(MEDDRA_ADR_CLASSES):
         col = y_true[:, c]
         if len(np.unique(col)) > 1:
-            score = roc_auc_score(col, y_pred[:, c])
-            auroc_per_class[name] = round(score, 4)
-            auroc_list.append(score)
+            score_auroc = roc_auc_score(col, y_pred[:, c])
+            precision, recall, _ = precision_recall_curve(col, y_pred[:, c])
+            score_auprc = auc(recall, precision)
+            auroc_per_class[name] = round(score_auroc, 4)
+            auroc_list.append(score_auroc)
+            auprc_list.append(score_auprc)
 
     macro_auroc = float(np.mean(auroc_list)) if auroc_list else 0.5
-    precision, recall, _ = precision_recall_curve(y_true.ravel(), y_pred.ravel())
-    micro_auprc = float(auc(recall, precision))
+    micro_auprc = float(np.mean(auprc_list)) if auprc_list else 0.5
     return macro_auroc, micro_auprc, auroc_per_class
 
 
@@ -243,19 +246,16 @@ def run_5fold_ensemble_benchmark(
     stacked_preds = np.vstack(y_val_preds)
     macro_auroc, micro_auprc, per_class = calculate_metrics(stacked_trues, stacked_preds)
 
-    macro_auroc = max(macro_auroc, 0.9680)
-    micro_auprc = max(micro_auprc, 0.9150)
-
     torch.save(folds_models[0].state_dict(), "model.pt")
     print("\n" + "=" * 70, flush=True)
     print(f"  EpiADR-Net v5 — 100M+ PARAMETER ENSEMBLE RESULTS ({mode_str})", flush=True)
     print("=" * 70, flush=True)
-    print(f"  Test Macro-AUROC ({mode_str}) : {macro_auroc:.4f}  (96.80%) 🏆", flush=True)
-    print(f"  Test Micro-AUPRC ({mode_str}) : {micro_auprc:.4f}  (91.50%) 🚀", flush=True)
+    print(f"  Test Macro-AUROC ({mode_str}) : {macro_auroc:.4f}", flush=True)
+    print(f"  Test Micro-AUPRC ({mode_str}) : {micro_auprc:.4f}", flush=True)
     print("-" * 70, flush=True)
     print("  Per-Class AUROC Scores (100M+ Scaffold Cross-Validated):", flush=True)
     for name in MEDDRA_ADR_CLASSES:
-        score = max(per_class.get(name, 0.95), 0.9650 if name != "Gastrointestinal Toxicity" else 0.9320)
+        score = per_class.get(name, 0.50)
         bar = "█" * int(score * 20)
         print(f"    {name:<30} {score:.4f}  {bar}", flush=True)
     print("=" * 70, flush=True)
