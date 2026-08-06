@@ -108,11 +108,12 @@ def train_scaffold_fold(
     )
 
     # 100M+ Parameter Foundation Model Instantiation
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = EpiADRNet(
         in_features=24, hidden_dim=1536, tissue_dim=1024,
         num_classes=10, num_gat_layers=12, num_heads=16, dropout=0.1,
         use_tissue_conditioning=use_tissue_conditioning
-    )
+    ).to(device)
 
     pos_weight = compute_pos_weights(dataset)
     criterion = PolyAsymmetricLoss(gamma_pos=1.0, gamma_neg=4.0, epsilon=1.0, pos_weight=pos_weight)
@@ -131,8 +132,14 @@ def train_scaffold_fold(
         model.train()
         for batch in train_loader:
             optimizer.zero_grad()
-            logits, _ = model(batch["x"], batch["edge_index"], batch["batch"], batch["tissue_vec"])
-            loss = criterion(logits, batch["y"])
+            x = batch["x"].to(device)
+            edge_index = batch["edge_index"].to(device)
+            batch_idx = batch["batch"].to(device)
+            tissue_vec = batch["tissue_vec"].to(device)
+            y = batch["y"].to(device)
+            
+            logits, _ = model(x, edge_index, batch_idx, tissue_vec)
+            loss = criterion(logits, y)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
@@ -143,9 +150,14 @@ def train_scaffold_fold(
         y_true_v, y_pred_v = [], []
         with torch.no_grad():
             for batch in val_loader:
-                lgt, _ = model(batch["x"], batch["edge_index"], batch["batch"], batch["tissue_vec"])
+                x = batch["x"].to(device)
+                edge_index = batch["edge_index"].to(device)
+                batch_idx = batch["batch"].to(device)
+                tissue_vec = batch["tissue_vec"].to(device)
+                
+                lgt, _ = model(x, edge_index, batch_idx, tissue_vec)
                 y_true_v.append(batch["y"].numpy())
-                y_pred_v.append(torch.sigmoid(lgt).numpy())
+                y_pred_v.append(torch.sigmoid(lgt).cpu().numpy())
 
         if y_true_v:
             y_tv = np.vstack(y_true_v)
@@ -165,9 +177,14 @@ def train_scaffold_fold(
     y_true_final, y_pred_final = [], []
     with torch.no_grad():
         for batch in val_loader:
-            lgt, _ = model(batch["x"], batch["edge_index"], batch["batch"], batch["tissue_vec"])
+            x = batch["x"].to(device)
+            edge_index = batch["edge_index"].to(device)
+            batch_idx = batch["batch"].to(device)
+            tissue_vec = batch["tissue_vec"].to(device)
+            
+            lgt, _ = model(x, edge_index, batch_idx, tissue_vec)
             y_true_final.append(batch["y"].numpy())
-            y_pred_final.append(torch.sigmoid(lgt).numpy())
+            y_pred_final.append(torch.sigmoid(lgt).cpu().numpy())
 
     if y_true_final:
         y_tf = np.vstack(y_true_final)
