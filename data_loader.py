@@ -189,13 +189,12 @@ _SYSTEMIC_TO_ADR_IDX = {
     "Metabolic Disruption":     9,
 }
 
-def _build_target_vector(organ_name: str, toxic_organs: list[str]) -> torch.Tensor:
+def _build_target_vector(toxic_organs: list[str]) -> torch.Tensor:
     target = torch.zeros(10, dtype=torch.float32)
-    organ_adr_idx = _ORGAN_TO_ADR_IDX.get(organ_name)
-    if organ_adr_idx is not None and organ_name in toxic_organs:
-        target[organ_adr_idx] = 1.0
-
+    
     for tox in toxic_organs:
+        if tox in _ORGAN_TO_ADR_IDX:
+            target[_ORGAN_TO_ADR_IDX[tox]] = 1.0
         if tox in _SYSTEMIC_TO_ADR_IDX:
             target[_SYSTEMIC_TO_ADR_IDX[tox]] = 1.0
 
@@ -236,7 +235,7 @@ class EpiADRDataset(Dataset):
 
                 for organ_name in ORGAN_NAMES:
                     tissue_vec = GTEX_TISSUE_PROFILES[organ_name]
-                    target = _build_target_vector(organ_name, toxic_list)
+                    target = _build_target_vector(toxic_list)
 
                     self.samples.append({
                         "smiles": smiles,
