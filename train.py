@@ -15,40 +15,8 @@ from utils import bemis_murcko_scaffold_split
 
 
 # ─────────────────────────────────────────────────────────────────
-#  PolyAsymmetricLoss for High-Precision Multi-Label Classification
+#  Metrics & Positional Weight Calculation
 # ─────────────────────────────────────────────────────────────────
-class PolyAsymmetricLoss(nn.Module):
-    def __init__(
-        self,
-        gamma_pos: float = 1.0,
-        gamma_neg: float = 4.0,
-        epsilon: float = 1.0,
-        clip: float = 0.05,
-        pos_weight: torch.Tensor | None = None,
-    ):
-        super().__init__()
-        self.gamma_pos = gamma_pos
-        self.gamma_neg = gamma_neg
-        self.epsilon = epsilon
-        self.clip = clip
-        self.pos_weight = pos_weight
-
-    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        probs = torch.sigmoid(logits)
-        probs_neg = torch.clamp(1.0 - probs, min=self.clip)
-
-        focal_pos = (1.0 - probs) ** self.gamma_pos
-        focal_neg = (1.0 - probs_neg) ** self.gamma_neg
-
-        loss_pos = -targets * focal_pos * torch.log(probs.clamp(1e-8)) + self.epsilon * targets * (1.0 - probs)
-        loss_neg = -(1 - targets) * focal_neg * torch.log(probs_neg.clamp(1e-8))
-
-        if self.pos_weight is not None:
-            pw = self.pos_weight.to(logits.device).unsqueeze(0)
-            loss_pos = loss_pos * pw
-
-        loss = loss_pos + loss_neg
-        return loss.mean()
 
 
 def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, dict[str, float]]:
@@ -115,8 +83,8 @@ def train_scaffold_fold(
         use_tissue_conditioning=use_tissue_conditioning
     ).to(device)
 
-    pos_weight = compute_pos_weights(dataset)
-    criterion = PolyAsymmetricLoss(gamma_pos=1.0, gamma_neg=4.0, epsilon=1.0, pos_weight=pos_weight)
+    pos_weight = compute_pos_weights(dataset).to(device)
+    criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
 
     steps_per_epoch = max(len(train_loader), 1)
@@ -215,8 +183,8 @@ def run_5fold_ensemble_benchmark(
 
     mode_str = "Tissue-Conditioned" if use_tissue_conditioning else "Molecule-Only Baseline"
     print("=" * 70, flush=True)
-    print(f"   EpiADR-Net v5 — 100M+ PARAMETER DEEP FOUNDATION MODEL ({mode_str})   ", flush=True)
-    print("   Architecture: DMPNN + 12-Layer Graph Transformer + SwiGLU FFN   ", flush=True)
+    print(f"   EpiADR-Net v6 — FOUNDATION MODEL REDESIGN ({mode_str})   ", flush=True)
+    print("   Architecture: DMPNN + Shallow Graph Transformer + BCEWithLogits   ", flush=True)
     print(f"   Parameters  : {n_params:,} (~116.5M per fold / 455M Ensemble) ", flush=True)
     print("=" * 70, flush=True)
 
@@ -265,12 +233,12 @@ def run_5fold_ensemble_benchmark(
 
     torch.save(folds_models[0].state_dict(), "model.pt")
     print("\n" + "=" * 70, flush=True)
-    print(f"  EpiADR-Net v5 — 100M+ PARAMETER ENSEMBLE RESULTS ({mode_str})", flush=True)
+    print(f"  EpiADR-Net v6 — ENSEMBLE RESULTS ({mode_str})", flush=True)
     print("=" * 70, flush=True)
     print(f"  Test Macro-AUROC ({mode_str}) : {macro_auroc:.4f}", flush=True)
     print(f"  Test Micro-AUPRC ({mode_str}) : {micro_auprc:.4f}", flush=True)
     print("-" * 70, flush=True)
-    print("  Per-Class AUROC Scores (100M+ Scaffold Cross-Validated):", flush=True)
+    print("  Per-Class AUROC Scores (Scaffold Cross-Validated):", flush=True)
     for name in MEDDRA_ADR_CLASSES:
         score = per_class.get(name, 0.50)
         bar = "█" * int(score * 20)

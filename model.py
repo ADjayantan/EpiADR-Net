@@ -185,13 +185,13 @@ class GraphTransformerBlock(nn.Module):
 # ─────────────────────────────────────────────────────────────────
 class EpiADRNet(nn.Module):
     """
-    EpiADR-Net v5 Foundation Edition (~116.5 Million Parameters):
+    EpiADR-Net v6 Foundation Edition:
       - Input Projection: 24 Atom Descriptors -> 1536 Hidden Dimension
       - 4 x DMPNN Directed Message Passing Layers (d_edge = 1536)
-      - 12 x Deep Graph Transformer Blocks (16 Attention Heads, SwiGLU FFN 1536->6144->1536)
+      - 4 x Shallow Graph Transformer Blocks (16 Attention Heads, SwiGLU FFN 1536->6144->1536)
       - 16-Head Gene Pathway Cross-Attention (1536 x 1024 GTEx Transcriptomics)
-      - Hierarchical Graph Pooling [Mean ‖ Max ‖ Sum] -> 4608-dim
-      - 4-Stage Deep Residual Classifier Head (4608 -> 2304 -> 1152 -> 576 -> 10)
+      - Hierarchical Graph Pooling [Mean ‖ Max] -> 3072-dim
+      - 4-Stage Deep Residual Classifier Head (3072 -> 1536 -> 768 -> 384 -> 10)
       - Monte Carlo Dropout Uncertainty Quantification (N=30)
     """
     def __init__(
@@ -200,7 +200,7 @@ class EpiADRNet(nn.Module):
         hidden_dim: int = 1536,
         tissue_dim: int = 1024,
         num_classes: int = 10,
-        num_gat_layers: int = 12,
+        num_gat_layers: int = 4,
         num_heads: int = 16,
         dropout: float = 0.1,
         edge_dropout: float = 0.05,
@@ -246,9 +246,9 @@ class EpiADRNet(nn.Module):
         # Dropout
         self.mc_dropout = nn.Dropout(p=dropout)
 
-        # Hierarchical Pooling Bottleneck (3 * 1536 = 4608)
+        # Hierarchical Pooling Bottleneck (2 * 1536 = 3072)
         self.pool_proj = nn.Sequential(
-            nn.Linear(3 * hidden_dim, 2 * hidden_dim),
+            nn.Linear(2 * hidden_dim, 2 * hidden_dim),
             nn.GELU(),
             nn.LayerNorm(2 * hidden_dim),
         )
@@ -296,11 +296,10 @@ class EpiADRNet(nn.Module):
                 nodes = h[mask]
                 mean_p[g] = nodes.mean(0)
                 max_p[g] = nodes.max(0)[0]
-                sum_p[g] = nodes.sum(0)
             else:
                 max_p[g] = 0.0
 
-        fused = torch.cat([mean_p, max_p, sum_p], dim=1) # [B, 3D] = [B, 4608]
+        fused = torch.cat([mean_p, max_p], dim=1) # [B, 2D] = [B, 3072]
         return self.pool_proj(fused)                      # [B, 2D] = [B, 3072]
 
     def forward(
