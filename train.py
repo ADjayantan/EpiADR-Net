@@ -79,7 +79,7 @@ def train_scaffold_fold(
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = EpiADRNet(
         in_features=24, hidden_dim=1536, tissue_dim=1024,
-        num_classes=10, num_gat_layers=12, num_heads=16, dropout=0.1,
+        num_classes=10, num_gat_layers=4, num_heads=16, dropout=0.1,
         use_tissue_conditioning=use_tissue_conditioning
     ).to(device)
 
@@ -176,7 +176,7 @@ def run_5fold_ensemble_benchmark(
 ):
     # Instantiate single model to display exact parameter count
     temp_m = EpiADRNet(
-        in_features=24, hidden_dim=1536, tissue_dim=1024, num_classes=10, num_gat_layers=12, num_heads=16,
+        in_features=24, hidden_dim=1536, tissue_dim=1024, num_classes=10, num_gat_layers=4, num_heads=16,
         use_tissue_conditioning=use_tissue_conditioning
     )
     n_params = temp_m.count_parameters()
@@ -241,7 +241,7 @@ def run_5fold_ensemble_benchmark(
     print("  Per-Class AUROC Scores (Scaffold Cross-Validated):", flush=True)
     for name in MEDDRA_ADR_CLASSES:
         score = per_class.get(name, 0.50)
-        bar = "█" * int(score * 20)
+        bar = "#" * int(score * 20)
         print(f"    {name:<30} {score:.4f}  {bar}", flush=True)
     print("=" * 70, flush=True)
 
