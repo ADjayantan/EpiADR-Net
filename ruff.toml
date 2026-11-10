@@ -1,0 +1,22 @@
+# Strict on the corrected pipeline; lenient on the legacy graph-transformer code,
+# which is retained for reference only (see AUDIT.md).
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+"model.py" = ["ALL"]
+"train.py" = ["ALL"]
+"utils.py" = ["ALL"]
+"data_loader.py" = ["ALL"]
+"app.py" = ["ALL"]
+"app_gradio.py" = ["ALL"]
+"api.py" = ["ALL"]
+"batch_export.py" = ["ALL"]
+"tests/test_api.py" = ["ALL"]
+"tests/test_data.py" = ["ALL"]
+"tests/test_model.py" = ["ALL"]
+"tests/test_metrics.py" = ["ALL"]
+"tests/conftest.py" = ["ALL"]

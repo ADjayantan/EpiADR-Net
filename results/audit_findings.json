@@ -1,0 +1,58 @@
+{
+  "A_csv_reachability": {
+    "train_py_imports_from_data_loader": [
+      "DataLoader",
+      "EpiADRDataset",
+      "EpiADRNet",
+      "MEDDRA_ADR_CLASSES",
+      "argparse",
+      "auc",
+      "bemis_murcko_scaffold_split",
+      "custom_collate_fn",
+      "nn",
+      "numpy",
+      "os",
+      "precision_recall_curve",
+      "roc_auc_score",
+      "torch",
+      "warnings"
+    ],
+    "train_py_imports_csv_loader": false,
+    "modules_using_csv_loaders": [],
+    "verdict": "DEAD CODE: load_labeled_records / GTExTissueLoader are defined but never called by any module. data/adr_records.csv never enters training."
+  },
+  "B_tissue_source": {
+    "training_profiles_are_random_dirichlet": true,
+    "csv_tissue_dim": 128,
+    "training_tissue_dim": 1024,
+    "dims_match": false,
+    "verdict": "SYNTHETIC: training conditions on np.random.dirichlet noise, not GTEx. The real CSV has 128 PCA features; training allocates 1024."
+  },
+  "C_label_organ_dependence": {
+    "build_target_vector_params": [
+      "toxic_organs"
+    ],
+    "label_fn_receives_organ": true,
+    "csv_unique_molecules": 1465,
+    "csv_rows": 7325,
+    "csv_molecules_whose_labels_vary_by_organ": 0,
+    "verdict": "NO ORGAN SIGNAL: _build_target_vector() never receives the organ, so all 10 organs for a drug get an identical target. Independently, in the real CSV 0/1465 molecules have labels that differ across organs. An organ-conditioned model therefore has nothing organ-specific to learn."
+  },
+  "D_benchmark_scale": {
+    "molecules_in_training_set": 5,
+    "molecule_names": [
+      "Acetaminophen",
+      "Aspirin",
+      "Ibuprofen",
+      "Diclofenac",
+      "Naproxen"
+    ],
+    "organs": 10,
+    "default_repeat_factor": 8,
+    "total_samples": 400,
+    "distinct_label_vectors": 5,
+    "folds": 5,
+    "molecules_held_out_per_fold": 1,
+    "verdict": "5 molecules, each duplicated 8x across 10 organs = 400 rows but only 5 independent label vectors. 5-fold CV therefore evaluates on 1 molecule per fold."
+  }
+}

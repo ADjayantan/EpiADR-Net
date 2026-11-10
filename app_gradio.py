@@ -123,13 +123,19 @@ def compare_two_organs(smiles: str, organ_a: str, organ_b: str, mc_passes: int):
 with gr.Blocks(title="EpiADR-Net v5 — Clinical & Biological Research Platform") as demo:
     gr.Markdown(
         """
-        # 🧬 EpiADR-Net v5: 100M+ Parameter Foundation ADR Platform (96.80% AUROC)
-        ### 116.5M Parameters · 12-Layer Graph Transformer · SwiGLU FFN · 1024-dim GTEx · 150+ FDA Drugs · 5-Fold Ensemble
-        [GitHub Repository](https://github.com/ADjayantan/EpiADR-Net) | [IEEE/ACM Manuscript](https://github.com/ADjayantan/EpiADR-Net/blob/main/MANUSCRIPT.md)
+        # 🧬 EpiADR-Net — Organ-Conditioned ADR Prediction (research demo)
+        ### 1,465 molecules · 5 organs · SIDER 4.1 + GTEx V8 · scaffold-split benchmark
 
-        > 🩺 **RESTRICTED RESEARCH ACCESS — FOR MEDICAL DOCTORS, PHARMACOLOGISTS & BIOLOGICAL RESEARCHERS ONLY**
-        > 
-        > ⚠️ **Clinical & Pharmacological Disclaimer**: This analytical engine generates in-silico computational predictions of organ-conditioned Adverse Drug Reactions (ADRs) based on GTEx V8 transcriptomic expression vectors and molecular graph representations. This analysis is **strictly reserved for certified Medical Doctors, Clinical Pharmacologists, Toxicologists, and Biological Researchers**. It is not designed for patient self-diagnosis or unverified clinical decisions.
+        [GitHub](https://github.com/ADjayantan/EpiADR-Net) · [Results](https://github.com/ADjayantan/EpiADR-Net/blob/main/RESULTS.md) · [Audit](https://github.com/ADjayantan/EpiADR-Net/blob/main/AUDIT.md)
+
+        > ⚠️ **Not for clinical, prescribing or preclinical decision-making.**
+        > This is a student research benchmark. The best measured result on this task is
+        > **macro-AUROC 0.636** under molecule-level scaffold cross-validation, and unseen-drug /
+        > unseen-organ generalisation is near chance (0.552). Probabilities shown here are not
+        > calibrated (ECE 0.111) and carry no indication, dose, route or patient context.
+        >
+        > The graph-transformer weights driving this demo have **not** been benchmarked on the
+        > corrected task — see `AUDIT.md`. Treat every output as illustrative only.
         """
     )
 
@@ -188,39 +194,59 @@ with gr.Blocks(title="EpiADR-Net v5 — Clinical & Biological Research Platform"
             outputs=[comp_plot]
         )
 
-    with gr.Tab("📊 Model Metrics & Benchmark Summary"):
+    with gr.Tab("📊 Benchmark results"):
         gr.Markdown(
             """
-            ### EpiADR-Net v5 — 100M+ Parameter Foundation Benchmark Results
+            ### Measured performance
 
-            | Experiment Split | Test Macro-AUROC | Test Micro-AUPRC | Benchmark Protocol | Rating |
-            | :--- | :--- | :--- | :--- | :--- |
-            | **Bemis-Murcko Scaffold 116.5M Ensemble** | **0.9680** 🏆 | **0.9150** 🚀 | 150+ FDA Drugs (15,000 Samples) | **9.8 / 10** |
-            | **Random Split Baseline** | 0.9720 | 0.9310 | 10 Human Organs | **9.9 / 10** |
+            Molecule-level Bemis-Murcko scaffold 5-fold CV over 1,465 molecules.
+            0 shared molecules and 0 shared scaffolds between train and test, asserted every fold.
+            Produced by `scripts/run_baselines.py` → `results/baselines.json`.
 
-            ### Per-Class AUROC Scores (100M+ Scaffold Cross-Validated)
-            | MedDRA ADR Class | AUROC Score | Status |
-            | :--- | :--- | :--- |
-            | Hepatotoxicity | **1.0000** 🏆 | Perfect Separation |
-            | Metabolic Disruption | **0.9967** 🏆 | Near-Perfect |
-            | Nephrotoxicity | **0.9868** | High Confidence |
-            | Cardiotoxicity | **0.9744** | High Confidence |
-            | Pulmotoxicity | **0.9650** | High Confidence |
-            | Dermatological Reaction | **0.9650** | High Confidence |
-            | Immunotoxicity | **0.9650** | High Confidence |
-            | Neurotoxicity | **0.9650** | High Confidence |
-            | Hematotoxicity | **0.9650** | High Confidence |
-            | Gastrointestinal Toxicity | **0.9320** | Robust Baseline |
+            | model | macro-AUROC | macro-AUPRC |
+            | :--- | ---: | ---: |
+            | per-organ base rate (no molecular input) | 0.5000 ± 0.000 | 0.2401 ± 0.008 |
+            | Morgan + LogReg, per organ | 0.5990 ± 0.021 | 0.3465 ± 0.016 |
+            | **Morgan + XGBoost, per organ** | **0.6364 ± 0.016** | **0.3862 ± 0.027** |
+            | Morgan + organ one-hot, shared | 0.6197 ± 0.020 | 0.3522 ± 0.015 |
+            | Morgan + real GTEx tissue, shared | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
+            | Morgan + **shuffled** GTEx tissue, shared | 0.6244 ± 0.013 | 0.3513 ± 0.023 |
 
-            ### Foundation Architecture Specification
-            - **Model Scale**: **116,512,896 (~116.5M trainable parameters/fold)**
-            - **Graph Transformer Backbone**: 12 Deep Layers · 16 Attention Heads ($d_{\text{model}} = 1536$)
-            - **SwiGLU FFN**: SwiGLU Feed-Forward Expansion Blocks ($1536 \to 6144 \to 1536$) + Pre-RMSNorm
-            - **DMPNN Engine**: 4 Directed Message Passing Layers ($d_{\text{edge}} = 1536$)
-            - **Tissue Profiles**: 10 Human Organs · 1024-dim High-Resolution GTEx Transcriptomic Profiles
-            - **Cross-Attention**: 16-Head Bi-Directional Gene Pathway Cross-Attention ($1536 \times 1024$)
-            - **Uncertainty**: Bayesian Monte Carlo Dropout ($N=30$ Stochastic Passes)
-            - **Ensemble Meta-Learner**: 5-Fold Scaffold Cross-Validation Blending
+            **Per-organ AUROC is the primary metric.** A predictor that only emits each organ's
+            base rate reaches *pooled* AUROC 0.656 while ranking no drug correctly, because
+            positives range from 7.8% (Lung) to 38.0% (Brain).
+
+            | organ | ADR | AUROC | positives |
+            | :--- | :--- | ---: | ---: |
+            | Liver | Hepatotoxicity | 0.6667 ± 0.015 | 18.5% |
+            | Heart | Arrhythmia | 0.5990 ± 0.009 | 29.2% |
+            | Brain | Seizure | 0.6317 ± 0.027 | 38.0% |
+            | Kidney | Nephrotoxicity | 0.6226 ± 0.041 | 26.5% |
+            | Lung | Pneumonitis | 0.6621 ± 0.081 | 7.8% |
+
+            ### Generalisation
+
+            | setting | best macro-AUROC |
+            | :--- | ---: |
+            | unseen drug, seen organ | 0.6243 |
+            | seen drug, unseen organ | 0.6975 *(molecule-only model is best)* |
+            | **unseen drug + unseen organ** | **0.5517 — near chance** |
+
+            ### Negative result on tissue conditioning
+
+            Conditioning on real GTEx profiles beats a plain organ one-hot by **+0.005**
+            macro-AUROC, against a fold s.d. of 0.012–0.020. Deranging the profiles so every
+            organ receives another organ's transcriptome changes the score by **−0.0001**.
+            The organ labels come from a MedDRA System Organ Class terminology mapping rather
+            than tissue measurement, so there is no transcriptomic signal to recover.
+            Full discussion in [RESULTS.md](https://github.com/ADjayantan/EpiADR-Net/blob/main/RESULTS.md).
+
+            ### Withdrawn figures
+
+            Earlier versions of this Space reported 0.9680 macro-AUROC on "150+ FDA drugs
+            (15,000 samples)". Those figures are withdrawn: the pipeline that produced them
+            trained on 5 molecules and conditioned on random vectors.
+            See [AUDIT.md](https://github.com/ADjayantan/EpiADR-Net/blob/main/AUDIT.md).
             """
         )
 

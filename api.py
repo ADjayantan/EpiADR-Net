@@ -11,7 +11,7 @@ from utils import highlight_toxic_subgraph, smiles_to_graph
 
 app = FastAPI(
     title="EpiADR-Net REST Microservice API",
-    description="Enterprise API for Tissue-Conditioned Zero-Shot Adverse Drug Reaction (ADR) Disaggregation — v5 Foundation Edition (100M+ Parameters)",
+    description="Research API for organ-conditioned adverse drug reaction prediction. Not for clinical use. Best measured macro-AUROC on this task is 0.636 (scaffold CV); see AUDIT.md and RESULTS.md.",
     version="5.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -62,7 +62,7 @@ def root():
         "status": "online",
         "service": "EpiADR-Net REST Microservice",
         "version": "5.0.0",
-        "architecture": "12-Layer Graph Transformer + SwiGLU FFN + DMPNN | 1024-dim GTEx | 116.5M params",
+        "architecture": "Graph transformer + DMPNN, tissue-conditioned. NOT benchmarked on the corrected task; see AUDIT.md",
         "documentation": "/docs"
     }
 

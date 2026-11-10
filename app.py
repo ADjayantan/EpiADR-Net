@@ -214,10 +214,24 @@ with tab3:
     st.subheader("📊 Generalization Benchmark & Mathematical Formulation")
     
     st.markdown("""
-    | Experiment Split | Test Macro-AUROC | Test Micro-AUPRC | Epochs | Split Strategy |
-    | :--- | :--- | :--- | :--- | :--- |
-    | **Bemis-Murcko Scaffold Split** | **0.4938** | **0.2589** | 10 | Zero structural overlap between train and test |
-    | **Random Split** | 0.4638 | 0.3018 | 10 | Standard random baseline |
+    **Measured on the corrected task** — molecule-level Bemis-Murcko scaffold 5-fold CV,
+    1,465 molecules, 0 shared molecules/scaffolds between train and test.
+    Source: `results/baselines.json` (`make baselines`).
+
+    | model | macro-AUROC | macro-AUPRC |
+    | :--- | ---: | ---: |
+    | per-organ base rate (no molecular input) | 0.5000 ± 0.000 | 0.2401 ± 0.008 |
+    | Morgan + LogReg, per organ | 0.5990 ± 0.021 | 0.3465 ± 0.016 |
+    | **Morgan + XGBoost, per organ** | **0.6364 ± 0.016** | **0.3862 ± 0.027** |
+    | Morgan + real GTEx tissue, shared | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
+    | Morgan + **shuffled** GTEx tissue, shared | 0.6244 ± 0.013 | 0.3513 ± 0.023 |
+
+    Per-organ AUROC is primary: a base-rate-only predictor reaches *pooled* AUROC 0.656
+    while ranking no drug correctly. Unseen-drug + unseen-organ generalisation is 0.552.
+
+    Tissue conditioning gains +0.005 over an organ one-hot and −0.0001 when the profiles
+    are deranged — see `RESULTS.md`. The graph-transformer weights used by this dashboard
+    have not been re-benchmarked on this task; see `AUDIT.md`.
     """)
 
     st.markdown("### 🧮 Mathematical Formulations")

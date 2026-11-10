@@ -10,3 +10,7 @@ env/
 *.pt
 *.pth
 *.bin
+
+# generated results are committed on purpose (see RESULTS.md); figures too
+!results/
+!results/figures/

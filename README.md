@@ -1,5 +1,5 @@
 ---
-title: EpiADR-Net — Tissue-Conditioned Zero-Shot ADR Platform
+title: EpiADR-Net — Organ-Conditioned ADR Prediction
 emoji: 🧬
 colorFrom: blue
 colorTo: purple
@@ -10,64 +10,129 @@ pinned: false
 license: mit
 ---
 
-# 🧬 EpiADR-Net (Antigravity 2.0 Edition)
-### Tissue-Conditioned Zero-Shot Side Effect Disaggregation Platform
+# EpiADR-Net
 
-[![Continuous Integration](https://github.com/ADjayantan/EpiADR-Net/actions/workflows/ci.yml/badge.svg)](https://github.com/ADjayantan/EpiADR-Net/actions)
-[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/jayantan/EpiADR-Net)
+**A leakage-audited benchmark for organ-conditioned adverse drug reaction prediction — and a negative result on transcriptomic conditioning.**
+
+[![CI](https://github.com/ADjayantan/EpiADR-Net/actions/workflows/ci.yml/badge.svg)](https://github.com/ADjayantan/EpiADR-Net/actions)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-2.0.0-green.svg)](https://fastapi.tiangolo.com/)
-[![Gradio](https://img.shields.io/badge/Gradio-5.16-orange.svg)](https://gradio.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**EpiADR-Net** is an end-to-end, publication-grade research platform and enterprise microservice stack engineered for **Tissue-Conditioned Zero-Shot Side Effect Disaggregation**. It predicts organ-specific Adverse Drug Reactions (ADRs) by conditioning molecular Graph Neural Network representations on human organ transcriptomic profiles.
+Given a drug's molecular structure and a target organ, predict whether the drug
+causes that organ's characteristic adverse reaction. 1 465 molecules, 5 organs,
+SIDER-derived labels, GTEx V8 transcriptomic organ profiles.
+
+The headline finding is negative, and that is the contribution:
+
+> **Conditioning on real GTEx transcriptomic profiles does not outperform a plain
+> organ one-hot (+0.005 macro-AUROC, against a fold s.d. of 0.012–0.020), and
+> replacing the real profiles with shuffled ones changes the result by −0.0001.
+> True zero-shot generalisation — an unseen drug in an unseen organ — is near
+> chance at 0.552.**
+
+![tissue conditioning does not beat an organ indicator](results/figures/fig2_zeroshot.png)
+
+`RESULTS.md` has the full tables. `AUDIT.md` explains why the figures previously
+published in this repository (Macro AUROC 0.7420, and 0.9680 in the manuscript)
+were withdrawn.
 
 ---
 
-## 🌟 Executive Highlights
+## Results at a glance
 
-| Category | Component / Benchmark | Detail / Metric |
-| :--- | :--- | :--- |
-| **Model Architecture** | 12-Layer Graph Transformer + SwiGLU FFN | Fuses molecular graph structure with 1024-dim GTEx transcriptomics |
-| **Generalization Split** | 5-Fold Bemis-Murcko Scaffold Split | Zero SMILES structural leakage between train and test sets |
-| **Audit Benchmark Score** | Honest Un-Floored Scaffold Metrics | **Macro AUROC: 0.7420 ± 0.031** | **Micro AUPRC: 0.6840 ± 0.042** |
-| **Uncertainty Estimation**| Monte Carlo Dropout ($N=20$) | Calculates expected probability $\mu$ and uncertainty bounds $\sigma$ |
-| **Explainable AI (XAI)** | GAT Layer 4 Attention Extraction | Visually highlights toxic functional atomic subgraphs |
-| **Hugging Face App** | Gradio Space (`app_gradio.py`) | Deployed live on Hugging Face Spaces (`sdk=gradio`) |
-| **REST Microservice** | FastAPI Backend (`api.py`) | Interactive Swagger UI documentation at `http://localhost:8000/docs` |
-| **Web Dashboard** | Multi-Tab Streamlit App (`app.py`) | Single organ explainability, dual-organ side-by-side comparative chart |
-| **Automated Testing** | Pytest Suite (`tests/`) | 100% Pass Rate across data, model, and API tests |
+Molecule-level Bemis-Murcko scaffold 5-fold CV. 0 shared molecules and 0 shared
+scaffolds between train and test, asserted on every fold.
+
+| model | macro-AUROC | macro-AUPRC |
+|:--|--:|--:|
+| per-organ base rate (no molecular input) | 0.5000 ± 0.000 | 0.2401 ± 0.008 |
+| Morgan + LogReg, per organ | 0.5990 ± 0.021 | 0.3465 ± 0.016 |
+| **Morgan + XGBoost, per organ** | **0.6364 ± 0.016** | **0.3862 ± 0.027** |
+| Morgan + organ one-hot, shared | 0.6197 ± 0.020 | 0.3522 ± 0.015 |
+| Morgan + real GTEx tissue, shared | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
+| Morgan + **shuffled** GTEx tissue, shared | 0.6244 ± 0.013 | 0.3513 ± 0.023 |
+
+**Per-organ AUROC is the primary metric, not pooled AUROC.** A predictor that
+outputs nothing but each organ's base rate scores pooled AUROC 0.656 while ranking
+no drug correctly — pooled figures on this task partly measure the Lung (7.8 %
+positive) versus Brain (38.0 %) prevalence gap. See `RESULTS.md §1`.
 
 ---
 
-## 🚀 Quick Start Guide
+## Why the negative result is a property of the labels
 
-### 1. Local Environment Setup
+Organ assignment in this dataset comes from a MedDRA System Organ Class
+terminology rule — hepatic terms map to Liver, arrhythmia terms to Heart, and so
+on (`DATA_PROVENANCE.md`). The organ label is which ontological class a
+side-effect term belongs to. It was never derived from tissue measurement, so
+there is no transcriptomic signal for GTEx features to recover. With five organs,
+"which organ" is five bits; a one-hot already carries all of them.
+
+Making tissue conditioning measurable needs labels that are organ-resolved by
+biology, or features that couple molecule and tissue mechanistically — drug–target
+binding (ChEMBL/DrugBank) weighted by that target's per-tissue expression (GTEx).
+Such a feature is not derivable from an organ identifier, so it can beat the
+one-hot in principle. That is the next step, and it is not claimed here.
+
+---
+
+## Reproducing everything
+
 ```bash
-git clone https://github.com/ADjayantan/EpiADR-Net.git
-cd EpiADR-Net
-
-# Install dependencies
 pip install -r requirements.txt
+
+make audit        # pipeline validity audit      -> results/audit_findings.json
+make baselines    # baselines + tissue ablation  -> results/baselines.json
+make zeroshot     # S1 / S2 / S3 generalisation  -> results/zeroshot.json
+make results      # all three, in order
+make test         # pytest
+python scripts/make_figures.py
 ```
 
-### 2. Run Gradio App (Hugging Face Space mode)
-```bash
-python app_gradio.py
+Every number in `README.md` and `RESULTS.md` is written by one of those scripts
+into `results/*.json`. Seeds are fixed (42). Nothing is transcribed by hand.
+
+---
+
+## Repository layout
+
+```
+epiadr/
+  task.py        organ-conditioned task construction + schema validation
+  splits.py      molecule-level Bemis-Murcko scaffold CV + leakage assertions
+  features.py    Morgan fingerprints; real 128-dim GTEx profile loader
+  eval.py        per-organ AUROC / AUPRC / ECE, fold aggregation
+scripts/
+  audit_pipeline.py   reproduces the validity audit in AUDIT.md
+  run_baselines.py    baseline suite + tissue-shuffle ablation
+  run_zeroshot.py     leave-one-organ-out generalisation (S1/S2/S3)
+  make_figures.py     renders results/figures/*.png from the JSON
+data/
+  adr_records.csv      1 465 molecules x 5 organs, 10 MedDRA ADR labels
+  tissue_profiles.csv  5 organs x 128 GTEx V8 PCA features
+model.py, train.py, utils.py, data_loader.py
+                     the original graph-transformer pipeline, retained for
+                     reference. Its reported metrics are withdrawn; see AUDIT.md.
+app_gradio.py, app.py, api.py
+                     Gradio Space, Streamlit dashboard, FastAPI service
+docs/                presentation and viva material
 ```
 
-### 3. Run Automated Pytest Suite
-```bash
-pytest -v tests/
-```
+---
 
-### 4. Launch FastAPI REST Microservice
-```bash
-uvicorn api:app --reload --port 8000
-```
-Swagger UI available at: [http://localhost:8000/docs](http://localhost:8000/docs)
+## Status and honest limitations
 
-### 5. Launch Streamlit Web App
-```bash
-streamlit run app.py
-```
+- The graph-transformer model in `model.py` has **not** been re-benchmarked on the
+  corrected task. The fingerprint baselines above are the current reference; any
+  GNN must beat **0.6364 ± 0.016** to be worth its parameters.
+- `data/adr_records.csv` is derived from SIDER 4.1 (CC BY-NC-SA 4.0) with
+  PubChem SMILES resolution; `data/tissue_profiles.csv` from GTEx V8. See
+  `DATA_PROVENANCE.md`.
+- No external validation set. Cross-dataset evaluation (OFFSIDES / FAERS) is not
+  done, so these numbers describe SIDER-derived labels only.
+- **Not for clinical or preclinical decision-making.** This is a student research
+  benchmark, not a validated safety model.
+
+## License
+
+MIT. Data under the licences recorded in `DATA_PROVENANCE.md`.

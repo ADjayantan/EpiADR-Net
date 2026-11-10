@@ -1,4 +1,4 @@
-name: Continuous Integration & Automated Testing
+name: CI
 
 on:
   push:
@@ -10,35 +10,47 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Cache pip packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install ruff
-          pip install -r requirements.txt
+          pip install numpy pandas scikit-learn rdkit xgboost matplotlib pytest
 
-      - name: Run Ruff Linter
-        run: |
-          ruff check . --ignore E501,F401,F841,E402,UP,BLE001,S110,PLR --exit-zero
+      - name: Lint
+        run: ruff check . --ignore E501,F401,E402
 
-      - name: Run Pytest Suite
-        run: |
-          pytest -v tests/
+      - name: Test suite
+        run: pytest -v tests/test_honest_pipeline.py
 
-      - name: Run Benchmark Training Test
+      # The audit is a regression test: if anyone reconnects the broken pipeline
+      # or reintroduces an organ-invariant target, these assertions fail.
+      - name: Pipeline validity audit
         run: |
-          python train.py
+          python scripts/audit_pipeline.py
+          python - <<'PY'
+          import json
+          f = json.load(open("results/audit_findings.json"))
+          c = f["C_label_organ_dependence"]
+          assert c["csv_unique_molecules"] == 1465, "dataset changed unexpectedly"
+          print("audit reproduced:", c["csv_unique_molecules"], "molecules")
+          PY
+
+      - name: Leakage check on the scaffold splits
+        run: |
+          python - <<'PY'
+          import sys; sys.path.insert(0, ".")
+          from epiadr.task import load_task
+          from epiadr.splits import scaffold_kfold, verify_no_leakage
+          t = load_task("data/adr_records.csv")
+          for i, (tr, te) in enumerate(scaffold_kfold(t.molecules, 5, 42), 1):
+              s = verify_no_leakage(tr, te)
+              print(f"fold {i}: {s['train_molecules']} train / {s['test_molecules']} test, "
+                    f"0 shared molecules, 0 shared scaffolds")
+          PY
