@@ -221,17 +221,19 @@ with tab3:
     | model | macro-AUROC | macro-AUPRC |
     | :--- | ---: | ---: |
     | per-organ base rate (no molecular input) | 0.5000 ± 0.000 | 0.2401 ± 0.008 |
-    | Morgan + LogReg, per organ | 0.5990 ± 0.021 | 0.3465 ± 0.016 |
-    | **Morgan + XGBoost, per organ** | **0.6364 ± 0.016** | **0.3862 ± 0.027** |
-    | Morgan + real GTEx tissue, shared | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
-    | Morgan + **shuffled** GTEx tissue, shared | 0.6244 ± 0.013 | 0.3513 ± 0.023 |
+    | Morgan fingerprint only | 0.5888 ± 0.013 | 0.3121 ± 0.029 |
+    | Morgan + organ one-hot | 0.6197 ± 0.020 | 0.3522 ± 0.015 |
+    | Morgan + real GTEx PCA profile | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
+    | Morgan + XGBoost, per organ | 0.6364 ± 0.016 | 0.3862 ± 0.027 |
+    | **Morgan + drug–target binding + mechanism (M8)** | **0.6547 ± 0.011** | **0.3978 ± 0.020** |
 
     Per-organ AUROC is primary: a base-rate-only predictor reaches *pooled* AUROC 0.656
-    while ranking no drug correctly. Unseen-drug + unseen-organ generalisation is 0.552.
+    while ranking no drug correctly. Unseen-drug + unseen-organ generalisation is 0.579.
 
-    Tissue conditioning gains +0.005 over an organ one-hot and −0.0001 when the profiles
-    are deranged — see `RESULTS.md`. The graph-transformer weights used by this dashboard
-    have not been re-benchmarked on this task; see `AUDIT.md`.
+    Drug–target binding is a real gain (+0.035 over an organ one-hot). Its coupling to
+    per-organ expression is not: a 12-fold permutation test of the organ→expression map
+    gives *p* = 0.385 — see `RESULTS.md §3`. The graph-transformer weights used by this
+    dashboard have not been re-benchmarked on this task; see `AUDIT.md`.
     """)
 
     st.markdown("### 🧮 Mathematical Formulations")

@@ -11,7 +11,7 @@ from utils import highlight_toxic_subgraph, smiles_to_graph
 
 app = FastAPI(
     title="EpiADR-Net REST Microservice API",
-    description="Research API for organ-conditioned adverse drug reaction prediction. Not for clinical use. Best measured macro-AUROC on this task is 0.636 (scaffold CV); see AUDIT.md and RESULTS.md.",
+    description="Research API for organ-conditioned adverse drug reaction prediction. Not for clinical use. Best measured macro-AUROC on this task is 0.655 (scaffold CV); see AUDIT.md and RESULTS.md.",
     version="5.0.0",
     docs_url="/docs",
     redoc_url="/redoc"

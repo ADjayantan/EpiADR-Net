@@ -1,0 +1,152 @@
+{
+  "config": {
+    "seed": 42,
+    "n_splits": 5,
+    "n_bits": 2048,
+    "model": "M8_morgan_binding_onehot_MECHANISM",
+    "n_permutations": 12
+  },
+  "real_macro_auroc": 0.6546863064502564,
+  "null_macro_auroc": [
+    0.658834662789126,
+    0.6529870494481658,
+    0.6410286346928602,
+    0.6477432206503384,
+    0.6562222551925695,
+    0.6515490249291328,
+    0.6470928962311688,
+    0.6479423655113021,
+    0.6541352013131678,
+    0.6557831108454747,
+    0.6557831108454747,
+    0.6519543719552462
+  ],
+  "permutations": [
+    {
+      "mapping": {
+        "Liver": "Lung",
+        "Heart": "Brain",
+        "Brain": "Kidney",
+        "Kidney": "Heart",
+        "Lung": "Liver"
+      },
+      "macro_auroc": 0.658834662789126
+    },
+    {
+      "mapping": {
+        "Liver": "Heart",
+        "Heart": "Lung",
+        "Brain": "Kidney",
+        "Kidney": "Liver",
+        "Lung": "Brain"
+      },
+      "macro_auroc": 0.6529870494481658
+    },
+    {
+      "mapping": {
+        "Liver": "Brain",
+        "Heart": "Lung",
+        "Brain": "Heart",
+        "Kidney": "Liver",
+        "Lung": "Kidney"
+      },
+      "macro_auroc": 0.6410286346928602
+    },
+    {
+      "mapping": {
+        "Liver": "Lung",
+        "Heart": "Kidney",
+        "Brain": "Heart",
+        "Kidney": "Brain",
+        "Lung": "Liver"
+      },
+      "macro_auroc": 0.6477432206503384
+    },
+    {
+      "mapping": {
+        "Liver": "Heart",
+        "Heart": "Liver",
+        "Brain": "Kidney",
+        "Kidney": "Lung",
+        "Lung": "Brain"
+      },
+      "macro_auroc": 0.6562222551925695
+    },
+    {
+      "mapping": {
+        "Liver": "Lung",
+        "Heart": "Brain",
+        "Brain": "Liver",
+        "Kidney": "Heart",
+        "Lung": "Kidney"
+      },
+      "macro_auroc": 0.6515490249291328
+    },
+    {
+      "mapping": {
+        "Liver": "Brain",
+        "Heart": "Kidney",
+        "Brain": "Liver",
+        "Kidney": "Lung",
+        "Lung": "Heart"
+      },
+      "macro_auroc": 0.6470928962311688
+    },
+    {
+      "mapping": {
+        "Liver": "Kidney",
+        "Heart": "Lung",
+        "Brain": "Heart",
+        "Kidney": "Liver",
+        "Lung": "Brain"
+      },
+      "macro_auroc": 0.6479423655113021
+    },
+    {
+      "mapping": {
+        "Liver": "Heart",
+        "Heart": "Brain",
+        "Brain": "Liver",
+        "Kidney": "Lung",
+        "Lung": "Kidney"
+      },
+      "macro_auroc": 0.6541352013131678
+    },
+    {
+      "mapping": {
+        "Liver": "Kidney",
+        "Heart": "Liver",
+        "Brain": "Lung",
+        "Kidney": "Heart",
+        "Lung": "Brain"
+      },
+      "macro_auroc": 0.6557831108454747
+    },
+    {
+      "mapping": {
+        "Liver": "Kidney",
+        "Heart": "Liver",
+        "Brain": "Lung",
+        "Kidney": "Heart",
+        "Lung": "Brain"
+      },
+      "macro_auroc": 0.6557831108454747
+    },
+    {
+      "mapping": {
+        "Liver": "Kidney",
+        "Heart": "Brain",
+        "Brain": "Liver",
+        "Kidney": "Lung",
+        "Lung": "Heart"
+      },
+      "macro_auroc": 0.6519543719552462
+    }
+  ],
+  "null_mean": 0.6517546587003356,
+  "null_std": 0.005020100554235039,
+  "effect": 0.0029316477499208293,
+  "n_null_ge_real": 4,
+  "p_value": 0.38461538461538464,
+  "runtime_seconds": 284.4
+}

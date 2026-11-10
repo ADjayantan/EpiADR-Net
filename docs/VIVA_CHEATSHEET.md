@@ -9,28 +9,44 @@ If you cannot point at the script that produced a number, do not say the number.
 
 > I built a benchmark for organ-conditioned adverse drug reaction prediction:
 > given a drug's structure and a target organ, predict that organ's
-> characteristic ADR. 1 465 molecules, 5 organs, SIDER labels, GTEx
-> transcriptomics. The best honest result is macro-AUROC 0.636 with
-> fingerprints and gradient boosting, under molecule-level scaffold
-> cross-validation.
+> characteristic ADR. 1 465 molecules, 5 organs, SIDER labels, molecule-level
+> scaffold cross-validation with leakage assertions.
 >
-> The main finding is negative. Conditioning on real GTEx tissue profiles does
-> not beat a five-dimensional organ one-hot, and if I shuffle the profiles so
-> every organ gets the wrong transcriptome, the score moves by 0.0001. I traced
-> it to the labels: organ assignment comes from a MedDRA terminology mapping, not
-> from tissue measurement, so there is no transcriptomic signal to recover. I
-> found this by auditing my own earlier pipeline, which reported 0.742 and was
-> wrong.
+> Two findings. Drug–target activity helps — adding PubChem binding data over a
+> 94-gene pharmacological panel takes macro-AUROC from 0.620 with a plain organ
+> one-hot to 0.655, which is my best result. Tissue transcriptomics does not.
+> Multiplying that binding by each target's per-organ expression adds nothing: a
+> 12-fold permutation test of the organ→expression map gives p = 0.385, and four
+> of the twelve *wrong* assignments scored higher than the correct one.
+>
+> I traced the cause to the labels: organ assignment comes from a MedDRA
+> terminology mapping, not from tissue measurement. The binding vector describes
+> the drug, which the labels encode; the expression factor describes the organ,
+> which they encode only as an ontological class.
+>
+> I found all of this by auditing my own earlier pipeline, which reported 0.742
+> and was wrong.
 
 ---
 
 ## Q1. What is the headline number?
 
-**Macro-AUROC 0.6364 ± 0.016** — Morgan fingerprint (ECFP4, 2048 bit) + XGBoost,
-one model per organ, molecule-level Bemis-Murcko scaffold 5-fold CV.
-`results/baselines.json`.
+**Macro-AUROC 0.6547 ± 0.011** — model M8: Morgan fingerprint (ECFP4, 2048 bit)
++ PubChem drug–target binding over a 94-gene panel + organ one-hot + mechanism
+coupling, XGBoost, molecule-level Bemis-Murcko scaffold 5-fold CV.
+`results/mechanism.json`.
 
-Per organ: Liver 0.667, Lung 0.662, Brain 0.632, Kidney 0.623, Heart 0.599.
+The progression, all on the same splits:
+
+| | macro-AUROC |
+|:--|--:|
+| Morgan only | 0.5888 ± 0.013 |
+| + organ one-hot | 0.6197 ± 0.020 |
+| + GTEx PCA profile | 0.6243 ± 0.012 |
+| + drug–target binding | 0.6464 ± 0.018 |
+| **+ mechanism coupling (M8)** | **0.6547 ± 0.011** |
+
+The fingerprint-only per-organ reference is 0.6364 ± 0.016 (`results/baselines.json`).
 
 ## Q2. Why per-organ AUROC and not pooled AUROC?
 
@@ -59,7 +75,9 @@ Three mechanisms, all machine-checked:
 
 ## Q4. Does tissue conditioning work? *(the question your examiner wants)*
 
-**No, and the ablation is the evidence.**
+**No — and I tested it twice, the second time properly.**
+
+First with the GTEx profile, where a single derangement was enough:
 
 | features | macro-AUROC |
 |:--|--:|
@@ -74,7 +92,53 @@ Macro-AUROC changes by **−0.0001**. The model was using the 128-dimensional
 profile as a lookup key for organ identity, nothing more. The one-hot row
 confirms it from the other side: 5 dimensions buy the same 0.62 that 128 do.
 
-## Q5. Why doesn't it work? Is your model too small?
+Then with explicit mechanistic coupling and real drug–target data — see Q4b.
+
+## Q4b. You added drug–target data. What happened?
+
+**The binding half helped. The tissue half did not.**
+
+Adding PubChem binding over the 94-gene panel: 0.6197 → 0.6464 (+0.027), and
+0.6547 with the coupling on top (+0.035). That is the first feature in the
+project to beat the one-hot by more than fold noise.
+
+But the coupling specifically — `binds(drug, gene) × expression(gene, organ)` —
+does not survive a proper control. A single derangement said +0.0088, which
+looked like a real signal. So I built the null properly: refit M8 under **12
+independent derangements**.
+
+| | macro-AUROC |
+|:--|--:|
+| real organ→expression map | 0.6547 |
+| null, 12 derangements | 0.6518 ± 0.0050 (range 0.6410–0.6588) |
+| derangements ≥ real | **4 / 12** |
+| empirical *p* | **0.385** |
+
+Not significant. The mechanism block is acting as extra drug-level descriptors —
+a nonlinear re-encoding of the binding vector — not as tissue biology.
+
+**If you say one thing from this slide, say this:** the single-derangement
+ablation nearly made me report a false positive. With a fold s.d. of 0.02 and a
+null spread of 0.005, one control draw cannot separate +0.008 from noise.
+
+## Q4c. Why did your hand-crafted coupling feature *hurt* in one version?
+
+Model M5 replaced the raw binding vector with the product and scored 0.6191,
+below M4's 0.6464 which had the same information uncoupled. Two reasons:
+
+1. The product zeroes out binding wherever expression is low, so the raw "this
+   drug hits CYP2C9" signal is destroyed.
+2. A gradient-boosted tree can already form the interaction from separate
+   columns — the split `organ == Liver AND binds ABCB11` is two levels of a
+   tree. Hand-coding the product removed the parts and added nothing.
+
+The coupling only helps when **added alongside** the binding vector (M8), and
+then by +0.008 — which the permutation test then shows is not organ-specific.
+
+This is a general lesson: hand-engineering an interaction a model can already
+learn usually loses information.
+
+## Q5. Why doesn't tissue conditioning work? Is your model too small?
 
 No — it is the labels, and capacity cannot fix it.
 
@@ -86,19 +150,24 @@ biology. Expression data cannot recover a signal that was never put in.
 Information-theoretically: five organs is about 2.3 bits. A one-hot carries all
 of them. The other 123 dimensions describe biology the label does not depend on.
 
+This also explains the split in Q4b. The binding vector describes the **drug**,
+which the labels encode — SIDER records that a compound causes hepatotoxicity,
+and that is a fact about the compound. The expression factor describes the
+**organ**, which the labels encode only as an ontological class. The product
+inherits signal from one factor and noise from the other.
+
 ## Q6. Then what would make the hypothesis testable?
 
-Two routes, both named in the manuscript:
+Two routes were available. I tested one of them.
 
-1. **Labels resolved by biology, not terminology** — organ-specific signals from
-   FAERS/OFFSIDES case data, or *in vitro* organ-specific toxicity assays.
-2. **Mechanistic coupling features** — drug–target binding from ChEMBL/DrugBank
-   weighted by that target's per-tissue expression in GTEx:
-   $\sum_t \text{affinity}(d,t)\cdot\text{expression}(t,\text{organ})$.
-   This is **not** derivable from an organ identifier, so it can beat the one-hot
-   control in principle.
+1. **Mechanistic coupling** — drug–target binding weighted by per-tissue
+   expression. **Tested (Q4b). Does not rescue it**, p = 0.385.
+2. **Labels resolved by biology, not terminology** — organ-specific signals from
+   FAERS/OFFSIDES case narratives, or *in vitro* organ-specific toxicity assays.
+   **Untested.** This is what is left.
 
-Neither is claimed in the current results.
+Until the labels change, every organ-side feature is bounded above by what a
+five-dimensional one-hot already encodes.
 
 ## Q7. Your README says "zero-shot". Did you test it?
 
@@ -106,9 +175,9 @@ Yes — three settings, and the strict one is near chance.
 
 | setting | best macro-AUROC |
 |:--|--:|
-| S1 unseen drug, seen organ | 0.6243 |
-| S2 seen drug, unseen organ | 0.6975 |
-| S3 **unseen drug + unseen organ** | **0.5517** |
+| S1 unseen drug, seen organ | 0.6547 (M8) |
+| S2 seen drug, unseen organ | 0.6997 (binding + one-hot) |
+| S3 **unseen drug + unseen organ** | **0.5786 (M8)** |
 
 The trap is S2, which is often reported as "zero-shot across tissues". It is the
 *easiest* setting: the molecule is not held out, so the model has seen that
@@ -116,7 +185,8 @@ drug's toxicity in four other organs, and organ ADRs correlate (mean pairwise
 *r* = 0.196). Proof that nothing organ-specific transfers: in S2 the **best**
 model is molecule-only with no organ input at all (0.6975).
 
-S3 holds out both. 0.552. That is the honest zero-shot number.
+S3 holds out both. **0.579** with the best feature set — still near chance. That
+is the honest zero-shot number.
 
 ## Q8. Why is a 116 M-parameter graph transformer not your headline model?
 
@@ -160,11 +230,14 @@ you found it first.
    emitted by a script into `results/*.json`.
 2. The demonstration that pooled AUROC is invalid here (0.656 with no molecular
    input), so future work on this task reports per-organ.
-3. The derangement ablation as a required control for any tissue-conditioning
-   claim — without it, "the model uses biology" and "the model knows which organ
-   this is" are indistinguishable.
-4. A diagnosed negative result, with a concrete, falsifiable proposal for what
-   would change it.
+3. **A real improvement**: drug–target activity over a pre-specified
+   pharmacological panel, +0.035 macro-AUROC over an organ one-hot.
+4. **The permutation test as a required control** for any tissue-conditioning
+   claim — a single derangement nearly produced a false positive here. Without
+   it, "the model uses biology" and "the model knows which organ this is" are
+   indistinguishable.
+5. A diagnosed negative result on the tissue half, with the one untested route
+   named.
 
 ---
 
@@ -173,19 +246,26 @@ you found it first.
 | | |
 |:--|:--|
 | molecules / rows / organs | 1 465 / 7 325 / 5 |
-| best macro-AUROC | **0.6364 ± 0.016** |
+| **best macro-AUROC (M8)** | **0.6547 ± 0.011** |
 | base-rate predictor | macro 0.500, pooled **0.656** |
-| one-hot vs real GTEx | 0.6197 → 0.6243 (+0.005) |
-| real vs deranged GTEx | 0.6243 → 0.6244 (**−0.0001**) |
-| S3 true zero-shot | **0.5517** |
+| Morgan only → + one-hot | 0.5888 → 0.6197 |
+| + drug–target binding | 0.6464 (**+0.027** over one-hot) |
+| + mechanism coupling | 0.6547 (**+0.035** over one-hot) |
+| one-hot vs real GTEx PCA | 0.6197 → 0.6243 (+0.005) |
+| real vs deranged GTEx PCA | **−0.0001** |
+| **permutation test, 12 derangements** | **p = 0.385, 4/12 beat real** |
+| S3 true zero-shot | **0.5786** |
+| panel / binding coverage | 94 genes, 6 582 hits, 58.6 % of molecules |
 | positives: Lung / Brain | 7.8 % / 38.0 % |
 | cross-organ ADR correlation | mean *r* = 0.196 |
-| reference-model ECE | 0.111 (not well calibrated — say so) |
+| reference ECE | 0.111 (not well calibrated — say so) |
 
 ## Things not to say
 
 - Do **not** call it a foundation model. 1 465 molecules.
 - Do **not** quote 0.742 or 0.968. Withdrawn.
+- Do **not** say the mechanism coupling "works". It gains +0.003 over the
+  permutation null at p = 0.385. The *binding* works; the *coupling* does not.
 - Do **not** say "state of the art". No external leaderboard comparison was run.
 - Do **not** say the probabilities are clinically usable. ECE 0.111.
 - If asked something not measured, say: *"I didn't measure that."*

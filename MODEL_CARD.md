@@ -5,11 +5,11 @@
 | | |
 |:--|:--|
 | **Task** | `(molecule, organ) → P(that organ's adverse reaction)` |
-| **Current reference model** | Morgan fingerprint (ECFP4, 2048 bit) + XGBoost, one model per organ |
-| **Inputs** | SMILES; organ identifier, or the organ's 128-dim GTEx V8 PCA profile |
+| **Current reference model** | M8 — Morgan fingerprint (ECFP4, 2048 bit) + PubChem drug–target binding (94-gene panel) + organ one-hot + mechanism coupling, XGBoost |
+| **Inputs** | SMILES; organ identifier; the drug's binding profile over a pre-specified 94-gene panel; that panel's per-organ expression (HPA nTPM) |
 | **Output** | One calibrated-ish probability per (molecule, organ) pair |
 | **Evaluation** | Molecule-level Bemis-Murcko scaffold 5-fold CV, seed 42, leakage asserted |
-| **Produced by** | `scripts/run_baselines.py` → `results/baselines.json` |
+| **Produced by** | `scripts/run_mechanism.py` → `results/mechanism.json` |
 
 A graph transformer (`model.py`, ~116 M parameters) also exists in this
 repository. It has **not** been re-benchmarked on the corrected task and no
@@ -21,13 +21,16 @@ because it is the strongest result that has actually been measured.
 Per-organ AUROC is primary. Pooled AUROC is reported for completeness only — a
 base-rate predictor with no molecular input reaches pooled 0.656 (see `AUDIT.md §6`).
 
-| model | macro-AUROC | macro-AUPRC | pooled-AUROC |
-|:--|--:|--:|--:|
-| per-organ base rate | 0.5000 ± 0.000 | 0.2401 ± 0.008 | 0.6561 |
-| Morgan + LogReg, per organ | 0.5990 ± 0.021 | 0.3465 ± 0.016 | 0.6358 |
-| **Morgan + XGBoost, per organ** | **0.6364 ± 0.016** | **0.3862 ± 0.027** | 0.6904 |
-| Morgan + real GTEx tissue, shared | 0.6243 ± 0.012 | 0.3510 ± 0.020 | 0.6949 |
-| Morgan + shuffled tissue, shared | 0.6244 ± 0.013 | 0.3513 ± 0.023 | 0.6954 |
+| model | macro-AUROC | macro-AUPRC |
+|:--|--:|--:|
+| per-organ base rate (no molecular input) | 0.5000 ± 0.000 | 0.2401 ± 0.008 |
+| Morgan fingerprint only | 0.5888 ± 0.013 | 0.3121 ± 0.029 |
+| Morgan + organ one-hot | 0.6197 ± 0.020 | 0.3522 ± 0.015 |
+| Morgan + real GTEx PCA profile | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
+| Morgan + shuffled GTEx PCA profile | 0.6244 ± 0.013 | 0.3513 ± 0.023 |
+| Morgan + XGBoost, per organ | 0.6364 ± 0.016 | 0.3862 ± 0.027 |
+| Morgan + drug–target binding + one-hot | 0.6464 ± 0.018 | 0.3811 ± 0.021 |
+| **M8 — + mechanism coupling** | **0.6547 ± 0.011** | **0.3978 ± 0.020** |
 
 | organ | AUROC | AUPRC | positives |
 |:--|--:|--:|--:|
@@ -41,18 +44,31 @@ base-rate predictor with no molecular input reaches pooled 0.656 (see `AUDIT.md 
 
 | setting | macro-AUROC (best) |
 |:--|--:|
-| S1 unseen drug, seen organ | 0.6243 |
-| S2 seen drug, unseen organ | 0.6975 (molecule-only model is best) |
-| S3 **unseen drug + unseen organ** | **0.5517 — near chance** |
+| S1 unseen drug, seen organ | 0.6547 (M8) |
+| S2 seen drug, unseen organ | 0.6997 (binding + one-hot) |
+| S3 **unseen drug + unseen organ** | **0.5786 (M8) — near chance** |
 
-## Known negative result
+## What helps and what does not
 
-Conditioning on real GTEx transcriptomic profiles does not beat a plain organ
-one-hot (+0.005 macro-AUROC, fold s.d. 0.012–0.020). Deranging the profiles so
-every organ receives another organ's transcriptome changes macro-AUROC by
-−0.0001. The organ labels were assigned by MedDRA System Organ Class terminology
-rather than by tissue measurement, so there is no transcriptomic signal to
-recover. See `RESULTS.md §3`.
+**Helps.** PubChem drug–target activity over the pre-specified 94-gene panel
+lifts macro-AUROC from 0.6197 (organ one-hot) to 0.6547 (+0.035) — the only
+feature in this repository to beat the one-hot by more than fold noise.
+
+**Does not help.** Multiplying that binding by each target's per-organ
+expression adds nothing identifiable. A 12-fold permutation test of the
+organ→expression map (`scripts/run_ablation_test.py`) gives:
+
+| | macro-AUROC |
+|:--|--:|
+| real assignment | 0.6547 |
+| null, 12 derangements | 0.6518 ± 0.0050 |
+| derangements ≥ real | 4 / 12 |
+| empirical *p* | **0.385** |
+
+Conditioning on the GTEx PCA profile likewise beats a one-hot by only +0.005,
+and deranging it moves the score by −0.0001. The organ labels were assigned by
+MedDRA System Organ Class terminology rather than tissue measurement, so there
+is no transcriptomic signal to recover. See `RESULTS.md §3–§4`.
 
 ## Training data
 
@@ -62,6 +78,10 @@ URLs, download dates and mapping rules in `DATA_PROVENANCE.md`; schema in
 `DATA_CONTRACT.md`.
 
 1 465 molecules, 7 325 (molecule, organ) rows, 5 organs.
+
+Drug–target activity: PubChem BioAssay, 6 582 drug–target hits over a
+pre-specified 94-gene panel. Per-gene tissue expression: Human Protein Atlas
+consensus tissue nTPM.
 
 ## Intended use
 
@@ -81,8 +101,13 @@ indication, dose, route, duration or patient context.
 - Evaluated only on SIDER-derived labels; no external validation (OFFSIDES, FAERS).
 - Five organs and one ADR per organ; systemic ADRs are not modelled by the
   reference model.
-- ECE 0.111 for the reference model — the probabilities are not well calibrated
-  and should not be read as risk estimates.
+- ECE 0.111 for the fingerprint reference model — the probabilities are not well
+  calibrated and should not be read as risk estimates.
+- PubChem "active" pools curated pharmacology with high-throughput screens, so
+  the binding matrix means "has measured activity against", not "binds at
+  affinity X". 58.6 % of molecules hit at least one panel gene.
+- The 94-gene panel is pre-specified by mechanism, not tuned; a larger or
+  differently chosen panel was not explored.
 - Class imbalance is severe for Lung (7.8 % positive); its AUROC has the widest
   fold spread (± 0.081).
 

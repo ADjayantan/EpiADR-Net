@@ -1,4 +1,4 @@
-# Organ-conditioned adverse drug reaction prediction: a leakage-audited benchmark and a negative result on transcriptomic conditioning
+# Organ-conditioned adverse drug reaction prediction: drug–target activity helps, tissue transcriptomics does not
 
 **A. D. Jayantan**
 Department of Computer Science and Engineering, VSB College of Engineering Technical Campus, Coimbatore
@@ -27,9 +27,18 @@ Conditioning on real 128-dimensional GTEx organ profiles improves macro-AUROC by
 **+0.005** over a five-dimensional organ one-hot, against a fold standard
 deviation of 0.012–0.020. Deranging the profiles, so that every organ is given
 another organ's transcriptome, changes macro-AUROC by **−0.0001**: the model uses
-the tissue vector as an organ index and nothing else. In the strictest
-generalisation setting — an unseen drug evaluated in an unseen organ —
-performance is near chance (0.552).
+the tissue vector as an organ index and nothing else.
+
+We then test the mechanistic route that this failure suggests. Adding PubChem
+drug–target activity over a pre-specified 94-gene pharmacological panel raises
+macro-AUROC to **0.6547 ± 0.011** (+0.035 over the one-hot) — a real gain, and
+the best result we measure. Multiplying that binding by each target's per-organ
+expression, however, adds nothing identifiable: a 12-fold permutation test of
+the organ→expression assignment places the correct map at **p = 0.385**, with 4
+of 12 wrong assignments scoring higher. The drug side of the product carries
+signal; the tissue side does not. In the strictest generalisation setting — an
+unseen drug evaluated in an unseen organ — performance remains near chance
+(0.579).
 
 We trace the cause to label provenance rather than to model capacity. Organ
 assignment in SIDER-derived datasets is produced by mapping MedDRA System Organ
@@ -67,8 +76,10 @@ reproduce for any study that assembles organ labels the same way.
    contributes nothing beyond organ identity (§4.2).
 4. A three-setting generalisation protocol (S1/S2/S3) showing that the "zero-shot"
    framing common in this literature is near chance when tested strictly (§4.3).
-5. An account of why, grounded in label provenance, with a concrete proposal for
-   what would make the hypothesis testable (§5).
+5. A mechanistic-coupling experiment with real drug–target and per-gene
+   expression data, separating the drug side of the product (which helps) from
+   the tissue side (which does not), with a permutation test (§4.4).
+6. An account of why, grounded in label provenance (§5).
 
 ## 2. Task formulation
 
@@ -165,6 +176,65 @@ drug-level toxicity, not organ-specific biology.
 S3, which holds out both drug and organ, is the setting the zero-shot claim
 actually describes. All models sit between 0.540 and 0.552.
 
+### 4.4 Drug–target activity helps; its coupling to tissue does not
+
+§4.2 leaves one route untested. Any feature that is a function of the organ
+alone is bounded by the one-hot; a mechanism feature is not, because it is a
+product $m_g(d, o) = \text{binds}(d, g)\cdot\text{expr}(g, o)$ whose mask
+depends on the drug and whose magnitude depends on the organ.
+
+We fix a 94-gene pharmacological panel in advance, by mechanism rather than by
+measured performance: hERG/KCNH2 for arrhythmia, ABCB11/BSEP for cholestatic
+injury, SLC22A6/OAT1 for renal tubular exposure, GABA-A and NMDA subunits for
+seizure threshold, the CYPs for hepatic exposure, and the major transporters and
+nuclear receptors that govern exposure. Binding comes from PubChem BioAssay
+outcomes (6 582 drug–target hits; 58.6 % of molecules hit at least one panel
+gene); per-gene expression comes from Human Protein Atlas consensus tissue nTPM,
+used in place of our own PCA-reduced profiles because 128 principal components
+cannot be inverted back to genes. The expression table reproduces textbook
+selectivity (KCNH2 peaks in heart, CYP3A4 and ABCB11 in liver, SLC22A6 in
+kidney, GRIN1 in brain).
+
+| model | macro-AUROC | vs one-hot |
+|:--|--:|--:|
+| M0 Morgan only | 0.5888 ± 0.013 | −0.031 |
+| M1 Morgan + organ one-hot | 0.6197 ± 0.020 | — |
+| M2 Morgan + GTEx PCA profile | 0.6243 ± 0.012 | +0.005 |
+| M4 Morgan + binding + one-hot | 0.6464 ± 0.018 | +0.027 |
+| M5 Morgan + coupling (replacing binding) | 0.6191 ± 0.020 | −0.001 |
+| M7 coupling only, no fingerprint | 0.5734 ± 0.015 | −0.046 |
+| **M8 Morgan + binding + one-hot + coupling** | **0.6547 ± 0.011** | **+0.035** |
+
+Two observations. First, binding is a real gain: M4 and M8 are the only features
+we test that beat the one-hot by more than fold noise. Second, the coupling must
+be *added to* the binding vector, not substituted for it — M5 replaces binding
+with the product and so zeroes out binding wherever expression is low, losing
+information a gradient-boosted tree could otherwise recover from M4's separate
+columns as the split `organ == Liver AND binds ABCB11`.
+
+**The permutation test.** M5 beat its single deranged control by +0.0088, which
+would have been reported as the first positive signal for tissue conditioning in
+this work. We instead constructed the null properly, refitting M8 under 12
+independent derangements of the organ→expression map:
+
+| | macro-AUROC |
+|:--|--:|
+| real assignment | 0.6547 |
+| null, 12 derangements | 0.6518 ± 0.0050 (range 0.6410–0.6588) |
+| derangements ≥ real | 4 / 12 |
+| empirical *p* | **0.385** |
+
+The effect is +0.0029 and not significant. The mechanism block's contribution
+survives permuting which organ each gene's expression belongs to, so it is
+acting as additional drug-level descriptors — a nonlinear re-encoding of the
+binding vector — rather than as tissue biology.
+
+This is a cautionary result in its own right. With a fold standard deviation of
+~0.02 and a null spread of ±0.005, a single-derangement ablation cannot separate
++0.008 from noise, and would have produced a false positive here. We recommend a
+permutation test over several derangements as the minimum control for
+tissue-conditioning claims of this magnitude.
+
 ## 5. Why: label provenance, not model capacity
 
 `DATA_PROVENANCE.md` records the organ assignment rule: MedDRA System Organ Class
@@ -186,15 +256,19 @@ both the one-hot control and a derangement ablation cannot distinguish "the mode
 uses tissue biology" from "the model knows which organ this is". We recommend
 both controls as a minimum for claims of this kind.
 
-**What would make the hypothesis testable.** Either (i) organ labels resolved by
-measurement rather than terminology — for example organ-specific signals mined
-from FAERS/OFFSIDES case narratives, or *in vitro* organ-specific toxicity
-assays; or (ii) features that couple molecule and tissue mechanistically, such as
-drug–target binding affinities from ChEMBL or DrugBank weighted by each target's
-per-tissue expression in GTEx. A mechanistic feature of form
-$\sum_t \text{affinity}(d, t)\cdot \text{expression}(t, \text{organ})$ is not
-derivable from an organ identifier, and can therefore beat the one-hot control in
-principle. Neither is attempted here.
+This also explains the asymmetry in §4.4. The binding vector describes the
+**drug**, which the labels do encode — SIDER records that a compound causes
+hepatotoxicity, and that is a fact about the compound. The expression factor
+describes the **organ**, which the labels encode only as an ontological class.
+The product therefore inherits signal from one factor and noise from the other,
+which is exactly what the permutation test measures.
+
+**What would make the hypothesis testable.** Route (ii) — mechanistic coupling —
+is now tested and does not rescue it. What remains is route (i): organ labels
+resolved by measurement rather than terminology, such as organ-specific signals
+mined from FAERS/OFFSIDES case narratives, or *in vitro* organ-specific toxicity
+assays. Until the labels change, every organ-side feature is bounded above by
+what a five-dimensional one-hot already encodes.
 
 ## 6. Limitations
 
@@ -203,19 +277,29 @@ the negative result is established for terminology-mapped labels and not for ADR
 labels in general. Five organs and one ADR per organ. The graph transformer in
 the repository has not been re-benchmarked on the corrected task, so this paper
 compares feature sets rather than architectures; a GNN could plausibly raise the
-absolute numbers, but the derangement ablation is architecture-independent in its
-logic. Reference-model ECE is 0.111, so probabilities should not be read as risk
-estimates.
+absolute numbers, but the permutation test is architecture-independent in its
+logic. PubChem "active" pools curated pharmacology with high-throughput screens,
+so the binding matrix means "has measured activity against" rather than a
+calibrated affinity, and 41.4 % of molecules hit no panel gene and contribute a
+zero binding vector; a richer affinity source could raise the binding gain,
+though it would not change which factor the permutation test implicates. The
+94-gene panel is pre-specified and was not tuned. ECE is 0.111, so probabilities
+should not be read as risk estimates.
 
 ## 7. Conclusion
 
 Built carefully, with molecule-level scaffold splits and leakage assertions,
 organ-conditioned ADR prediction on SIDER-derived labels reaches macro-AUROC
-0.636; conditioning on GTEx transcriptomics adds +0.005 over an organ one-hot and
-survives no derangement ablation; and unseen-drug/unseen-organ generalisation is
-near chance. The limitation is in how the labels were made, not in the model. We
-publish the benchmark, the audit of our own earlier incorrect figures, and the
-ablation protocol, so that the next attempt at this hypothesis can be checked.
+**0.6547 ± 0.011** once drug–target activity is included — a real +0.035 over an
+organ one-hot. Conditioning on tissue transcriptomics adds nothing identifiable,
+whether as a GTEx profile (+0.005, derangement −0.0001) or as an explicit
+binding × expression product (permutation test *p* = 0.385), and
+unseen-drug/unseen-organ generalisation stays near chance. The drug side of the
+mechanism carries signal; the tissue side does not, because the labels resolve
+organs by terminology rather than measurement. We publish the benchmark, the
+audit of our own earlier incorrect figures, and the permutation protocol that
+caught a false positive we were about to report, so that the next attempt at
+this hypothesis can be checked.
 
 ## Data and code availability
 

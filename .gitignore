@@ -14,3 +14,7 @@ env/
 # generated results are committed on purpose (see RESULTS.md); figures too
 !results/
 !results/figures/
+
+# bulk external downloads — refetch with `make targets` / `make expression`
+data/external/*.zip
+data/external/gene_active_cids.json

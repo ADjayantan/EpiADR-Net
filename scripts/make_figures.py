@@ -154,6 +154,79 @@ def fig_per_organ():
     return out
 
 
+def fig_mechanism():
+    with open("results/mechanism.json", encoding="utf-8") as fh:
+        d = json.load(fh)
+    r = d["results"]
+    order = [
+        ("M0_morgan_only", "Morgan only", C_MOL),
+        ("M1_morgan_onehot", "+ organ one-hot", C_ONEHOT),
+        ("M2_morgan_gtex_pca", "+ GTEx PCA profile", C_CHANCE),
+        ("M4_morgan_binding_onehot", "+ drug-target binding", C_TISSUE),
+        ("M8_morgan_binding_onehot_MECHANISM", "+ mechanism coupling", "#1f7a55"),
+    ]
+    vals = [r[k]["aggregate"]["macro_auroc"]["mean"] for k, _, _ in order]
+    errs = [r[k]["aggregate"]["macro_auroc"]["std"] for k, _, _ in order]
+    cols = [c for _, _, c in order]
+
+    fig, ax = plt.subplots(figsize=(7.4, 4.0))
+    x = np.arange(len(order))
+    ax.bar(x, vals, 0.6, yerr=errs, color=cols, alpha=.93,
+           error_kw=dict(ecolor=INK, lw=.9, capsize=3))
+    for xi, (v, e) in enumerate(zip(vals, errs, strict=True)):
+        ax.text(xi, v + e + .004, f"{v:.3f}", ha="center", fontsize=8, color=INK)
+    ax.axhline(0.5, color=INK, ls="--", lw=1)
+    ax.text(len(order) - .45, 0.504, "chance", fontsize=7.5, color=INK)
+    ax.set_xticks(x, [lab for _, lab, _ in order], fontsize=8.2)
+    ax.set_ylim(0.48, 0.70)
+    ax.set_ylabel("per-organ (macro) AUROC")
+    ax.set_title("Drug-target data helps; the gain is not tissue-specific",
+                 fontsize=10.5, loc="left", weight="bold", pad=10)
+    ax.grid(axis="y", color=GRID, lw=.6)
+    ax.set_axisbelow(True)
+    fig.tight_layout()
+    out = f"{FIGDIR}/fig4_mechanism.png"
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
+def fig_permutation():
+    with open("results/ablation_test.json", encoding="utf-8") as fh:
+        d = json.load(fh)
+    null = np.asarray(d["null_macro_auroc"])
+    real = d["real_macro_auroc"]
+
+    fig, ax = plt.subplots(figsize=(7.0, 3.4))
+    ax.scatter(null, np.zeros_like(null) + 0.02 * np.arange(len(null)) - 0.1 * 0,
+               s=46, color=C_CHANCE, alpha=.85, zorder=3,
+               label=f"deranged organ→expression (n={len(null)})")
+    ax.axvline(real, color="#c2402f", lw=2.2, zorder=4,
+               label=f"real assignment ({real:.4f})")
+    ax.axvline(float(null.mean()), color=INK, ls="--", lw=1.1, zorder=2,
+               label=f"null mean ({null.mean():.4f})")
+    ax.set_yticks([])
+    ax.set_xlabel("per-organ (macro) AUROC, M8 model")
+    ax.set_title(
+        f"Permutation test: the real organ→expression map is not special "
+        f"(p = {d['p_value']:.2f})",
+        fontsize=10.5, loc="left", weight="bold", pad=10)
+    ax.grid(axis="x", color=GRID, lw=.6)
+    ax.set_axisbelow(True)
+    ax.legend(frameon=False, fontsize=8, loc="upper center",
+              bbox_to_anchor=(0.5, -0.28), ncol=3)
+    fig.tight_layout()
+    out = f"{FIGDIR}/fig5_permutation.png"
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
 if __name__ == "__main__":
-    for f in (fig_baselines(), fig_zeroshot(), fig_per_organ()):
+    figs = [fig_baselines(), fig_zeroshot(), fig_per_organ()]
+    if os.path.exists("results/mechanism.json"):
+        figs.append(fig_mechanism())
+    if os.path.exists("results/ablation_test.json"):
+        figs.append(fig_permutation())
+    for f in figs:
         print("wrote", f)

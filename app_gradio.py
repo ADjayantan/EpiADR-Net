@@ -130,8 +130,8 @@ with gr.Blocks(title="EpiADR-Net v5 — Clinical & Biological Research Platform"
 
         > ⚠️ **Not for clinical, prescribing or preclinical decision-making.**
         > This is a student research benchmark. The best measured result on this task is
-        > **macro-AUROC 0.636** under molecule-level scaffold cross-validation, and unseen-drug /
-        > unseen-organ generalisation is near chance (0.552). Probabilities shown here are not
+        > **macro-AUROC 0.655** under molecule-level scaffold cross-validation, and unseen-drug /
+        > unseen-organ generalisation is near chance (0.579). Probabilities shown here are not
         > calibrated (ECE 0.111) and carry no indication, dose, route or patient context.
         >
         > The graph-transformer weights driving this demo have **not** been benchmarked on the
@@ -206,11 +206,13 @@ with gr.Blocks(title="EpiADR-Net v5 — Clinical & Biological Research Platform"
             | model | macro-AUROC | macro-AUPRC |
             | :--- | ---: | ---: |
             | per-organ base rate (no molecular input) | 0.5000 ± 0.000 | 0.2401 ± 0.008 |
-            | Morgan + LogReg, per organ | 0.5990 ± 0.021 | 0.3465 ± 0.016 |
-            | **Morgan + XGBoost, per organ** | **0.6364 ± 0.016** | **0.3862 ± 0.027** |
-            | Morgan + organ one-hot, shared | 0.6197 ± 0.020 | 0.3522 ± 0.015 |
-            | Morgan + real GTEx tissue, shared | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
-            | Morgan + **shuffled** GTEx tissue, shared | 0.6244 ± 0.013 | 0.3513 ± 0.023 |
+            | Morgan fingerprint only | 0.5888 ± 0.013 | 0.3121 ± 0.029 |
+            | Morgan + organ one-hot | 0.6197 ± 0.020 | 0.3522 ± 0.015 |
+            | Morgan + real GTEx PCA profile | 0.6243 ± 0.012 | 0.3510 ± 0.020 |
+            | Morgan + **shuffled** GTEx PCA profile | 0.6244 ± 0.013 | 0.3513 ± 0.023 |
+            | Morgan + XGBoost, per organ | 0.6364 ± 0.016 | 0.3862 ± 0.027 |
+            | Morgan + drug–target binding + one-hot | 0.6464 ± 0.018 | 0.3811 ± 0.021 |
+            | **+ mechanism coupling (M8)** | **0.6547 ± 0.011** | **0.3978 ± 0.020** |
 
             **Per-organ AUROC is the primary metric.** A predictor that only emits each organ's
             base rate reaches *pooled* AUROC 0.656 while ranking no drug correctly, because
@@ -228,17 +230,33 @@ with gr.Blocks(title="EpiADR-Net v5 — Clinical & Biological Research Platform"
 
             | setting | best macro-AUROC |
             | :--- | ---: |
-            | unseen drug, seen organ | 0.6243 |
-            | seen drug, unseen organ | 0.6975 *(molecule-only model is best)* |
-            | **unseen drug + unseen organ** | **0.5517 — near chance** |
+            | unseen drug, seen organ | 0.6547 (M8) |
+            | seen drug, unseen organ | 0.6997 |
+            | **unseen drug + unseen organ** | **0.5786 — near chance** |
 
-            ### Negative result on tissue conditioning
+            ### What helps: drug–target activity
 
-            Conditioning on real GTEx profiles beats a plain organ one-hot by **+0.005**
-            macro-AUROC, against a fold s.d. of 0.012–0.020. Deranging the profiles so every
-            organ receives another organ's transcriptome changes the score by **−0.0001**.
-            The organ labels come from a MedDRA System Organ Class terminology mapping rather
-            than tissue measurement, so there is no transcriptomic signal to recover.
+            PubChem binding data over a pre-specified 94-gene pharmacological panel
+            (hERG, BSEP, OAT1, the CYPs, GABA-A and NMDA subunits, major transporters)
+            lifts macro-AUROC from 0.6197 to **0.6547**, +0.035 over an organ one-hot.
+            This is the only feature here that beats the one-hot by more than fold noise.
+
+            ### What does not: tissue conditioning
+
+            Multiplying that binding by each target's per-organ expression adds nothing
+            identifiable. A 12-fold permutation test of the organ→expression map:
+
+            | | macro-AUROC |
+            | :--- | ---: |
+            | real assignment | 0.6547 |
+            | null, 12 derangements | 0.6518 ± 0.0050 |
+            | derangements ≥ real | **4 / 12** |
+            | empirical *p* | **0.385** |
+
+            The GTEx PCA profile likewise beats a one-hot by only +0.005, and deranging it
+            moves the score by −0.0001. The organ labels come from a MedDRA System Organ
+            Class terminology mapping rather than tissue measurement, so there is no
+            transcriptomic signal to recover.
             Full discussion in [RESULTS.md](https://github.com/ADjayantan/EpiADR-Net/blob/main/RESULTS.md).
 
             ### Withdrawn figures

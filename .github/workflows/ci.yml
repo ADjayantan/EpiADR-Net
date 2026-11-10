@@ -27,7 +27,7 @@ jobs:
         run: ruff check . --ignore E501,F401,E402
 
       - name: Test suite
-        run: pytest -v tests/test_honest_pipeline.py
+        run: pytest -v tests/test_honest_pipeline.py tests/test_mechanism.py
 
       # The audit is a regression test: if anyone reconnects the broken pipeline
       # or reintroduces an organ-invariant target, these assertions fail.

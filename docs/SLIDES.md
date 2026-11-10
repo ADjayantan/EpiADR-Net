@@ -7,7 +7,7 @@ footer: 'A. D. Jayantan | VSB College of Engineering Technical Campus'
 ---
 
 # EpiADR-Net
-## A leakage-audited benchmark for organ-conditioned ADR prediction — and a negative result
+## Organ-conditioned ADR prediction: drug–target data helps, tissue transcriptomics does not
 
 **A. D. Jayantan**
 1 465 molecules · 5 organs · SIDER 4.1 + GTEx V8
@@ -95,6 +95,53 @@ The model used the 128-dim profile as a lookup key for organ identity.
 
 ---
 
+# Finding 4 — drug–target activity **does** help
+
+Pre-specified 94-gene pharmacological panel (hERG, BSEP, OAT1, CYPs, GABA-A, NMDA…),
+PubChem binding data, HPA per-gene tissue expression.
+
+| model | macro-AUROC | vs one-hot |
+| :--- | ---: | ---: |
+| Morgan only | 0.589 ± .013 | −0.031 |
+| + organ one-hot | 0.620 ± .020 | — |
+| + GTEx PCA profile | 0.624 ± .012 | +0.005 |
+| + **drug–target binding** | 0.646 ± .018 | **+0.027** |
+| + mechanism coupling (**M8**) | **0.655 ± .011** | **+0.035** |
+
+First feature in the project to beat the one-hot by more than fold noise.
+
+---
+
+# Finding 5 — but the gain is **not** tissue-specific
+
+A single derangement said the coupling gained **+0.0088**. That looked real.
+So we built the null properly — **12 independent derangements**:
+
+![w:860](../results/figures/fig5_permutation.png)
+
+| real | null (n=12) | ≥ real | *p* |
+| ---: | ---: | ---: | ---: |
+| 0.6547 | 0.6518 ± 0.0050 | **4 / 12** | **0.385** |
+
+Four *wrong* organ→expression maps scored higher than the correct one.
+
+---
+
+# The lesson
+
+> With a fold s.d. of 0.02 and a null spread of 0.005, a **single-derangement
+> ablation cannot separate +0.008 from noise** — and would have produced a false
+> positive here.
+
+The binding vector describes the **drug** — the labels encode that → it helps.
+The expression factor describes the **organ** — the labels encode that only as
+an ontological class → it does not.
+
+Hand-coding `binds × expr` *in place of* binding also **hurt** (0.619 vs 0.646):
+a boosted tree already forms `organ == Liver AND binds ABCB11` from two columns.
+
+---
+
 # Why — the labels, not the model
 
 Organ assignment comes from a **MedDRA System Organ Class terminology mapping**
@@ -114,17 +161,18 @@ describe biology the label does not depend on.
 
 # What would make it testable
 
-**1. Labels resolved by biology, not terminology**
+**1. Mechanistic coupling features** — ✅ **tested**
+
+$$\text{feature}_g(d, \text{organ}) = \text{binds}(d, g)\cdot \text{expression}(g, \text{organ})$$
+
+Does not rescue it: permutation test *p* = 0.385.
+
+**2. Labels resolved by biology, not terminology** — ❌ **untested, and what is left**
+
 FAERS / OFFSIDES case-level signals; *in vitro* organ-specific assays.
 
-**2. Mechanistic coupling features**
-
-$$\text{feature}(d, \text{organ}) = \sum_{t} \text{affinity}(d, t)\cdot \text{expression}(t, \text{organ})$$
-
-Drug–target binding (ChEMBL / DrugBank) × per-tissue expression (GTEx).
-
-**Not derivable from an organ identifier** → it can beat the one-hot control in
-principle. Neither is claimed in the current results.
+Until the labels change, every organ-side feature is bounded above by a
+five-dimensional one-hot.
 
 ---
 
@@ -159,10 +207,11 @@ Finding this, documenting it, and republishing corrected numbers is the result.
 1. **Benchmark** — leakage-audited, molecule-level scaffold CV, every number
    emitted by a script
 2. **Metric correction** — pooled AUROC invalid here (0.656 with no input)
-3. **Required control** — the derangement ablation
-4. **Diagnosed negative result** — with a falsifiable proposal for what changes it
+3. **A real improvement** — drug–target activity, **+0.035** over an organ one-hot
+4. **Required control** — the **permutation test**, not a single derangement
+5. **Diagnosed negative result** on the tissue half, with the one route left named
 
-Best honest result: **macro-AUROC 0.6364 ± 0.016**
-True zero-shot (S3): **0.5517**
+Best honest result: **macro-AUROC 0.6547 ± 0.011** (M8)
+True zero-shot (S3): **0.5786**
 
 `make results` · [github.com/ADjayantan/EpiADR-Net](https://github.com/ADjayantan/EpiADR-Net)
